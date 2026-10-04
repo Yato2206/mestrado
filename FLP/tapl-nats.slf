@@ -21,7 +21,7 @@ Vasco T. Vasconcelos
 
 
 terminals
-    true false if then else succ pred iszero // terms
+    true false if then else succ pred iszero max// terms
     Bool Nat // types
     value nv // judgment names
 
@@ -30,7 +30,7 @@ terminals
 */
 syntax
     t ::=  true  |  false  |  if t then t else t
-         |    0  |  succ t |  pred t  |  iszero t
+         |    0  |  succ t |  pred t  |  iszero t | t max t
 
 syntax
     T ::=  Bool  |  Nat
@@ -110,6 +110,27 @@ t1 -> t1'
 ------------------ E-IsZero
 iszero t1 -> iszero t1'
 
+nv t2
+-------------------------- E-MaxZeroL
+0 max t2 -> t2
+
+nv t1
+-------------------------- E-MaxZeroR
+t1 max 0 -> t1
+
+nv t1
+nv t2
+-------------------------- E-MaxSucc
+(succ t1) max (succ t2) -> succ (t1 max t2)
+
+t1 -> t1'
+-------------------------- E-MaxL
+t1 max t2 -> t1' max t2
+
+t2 -> t2'
+-------------------------- E-MaxR
+t1 max t2 -> t1 max t2'
+
 
 // Typing: a relation on a term and a type
 judgment typing: t : T
@@ -141,6 +162,10 @@ pred t1 : Nat
 ---------------- T-IsZero
 iszero t1 : Bool
 
+   t1 : Nat 
+   t2 : Nat
+---------------- T-Max
+t1 max t2 : Nat
 
 /*
 4. Basic proofs
