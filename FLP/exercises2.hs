@@ -115,6 +115,7 @@ isNumericValue _ = False
 consts :: Term -> Set.Set Term
 consts TTrue = Set.singleton TTrue
 consts FFalse = Set.singleton FFalse
+consts Zero = Set.singleton Zero
 consts (If t1 t2 t3) = consts t1 `Set.union` consts t2 `Set.union` consts t3
 -- 10
 consts (Succ t1) = consts t1
@@ -151,14 +152,10 @@ step (IsZero (Succ nv)) = FFalse
 -- E-IsZero
 step (IsZero t1) = IsZero (step t1)
 -- 18
--- Max computation rules
-
 step (Max Zero Zero) = Zero
 step (Max Zero (Succ nv2)) = Succ nv2
 step (Max (Succ nv1) Zero) = Succ nv1
-step (Max (Succ nv1) (Succ nv2)) =
-  Succ (step (Max nv1 nv2))
--- Max congruence rules
+step (Max (Succ nv1) (Succ nv2)) = Succ (step (Max nv1 nv2))
 step (Max t1 t2)
   | not (isNumericValue t1) =
       Max (step t1) t2

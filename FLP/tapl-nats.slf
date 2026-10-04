@@ -1,0 +1,815 @@
+/*
+Arithmetic Expressions
+Expressions, types, and operations on these
+
+A SASyLF adaptation of some results in Types and Programming Languages (TAPL), by
+Benjamin Pierce, 2002, The MIT Press.
+
+Page numbers and references to exercises and results are from TAPL.
+
+Fundamentals of Programming Languages
+MSc in Informatics Engineering
+Faculty of Sciences
+University of Lisbon
+2026/2027
+Vasco T. Vasconcelos
+*/
+
+/*
+1. Identifiers required for syntax and judgments
+*/
+
+
+terminals
+    true false if then else succ pred iszero // terms
+    Bool Nat // types
+    value nv // judgment names
+
+/*
+2. The syntax for terms and types
+*/
+syntax
+    t ::=  true  |  false  |  if t then t else t
+         |    0  |  succ t |  pred t  |  iszero t
+
+syntax
+    T ::=  Bool  |  Nat
+
+
+/*
+3. Judgments
+
+are composed of a declaration stating the name and the form of the judgment
+and zero or more rules.
+*/
+
+
+// Predicate numerical values: a predicate on terms
+judgment numerical-values: nv t
+
+---- nv-zero
+nv 0
+
+nv t
+--------- nv-succ
+nv succ t
+
+
+// Predicate value: a predicate on terms
+judgment value-term: value t
+
+---------- value-true
+value true
+
+----------- value-false
+value false
+
+  nv t
+------- value-nv
+value t
+
+
+// Evaluation: a relation on pairs of terms
+judgment step: t -> t
+
+------------------------------ E-IfTrue
+if true then t2 else t3 -> t2
+
+
+------------------------------- E-IfFalse
+if false then t2 else t3 -> t3
+
+         t1 -> t1'
+------------------------------------------------ E-If
+if t1 then t2 else t3 -> if t1' then t2 else t3
+
+t1 -> t1'
+------------------ E-Succ
+succ t1 -> succ t1'
+
+------------ E-PredZero
+pred 0 -> 0
+
+nv t1
+---------------------- E-PredSucc
+pred (succ t1) -> t1
+
+
+t1 -> t1'
+------------------ E-Pred
+pred t1 -> pred t1'
+
+----------------- E-IsZeroZero
+iszero 0 -> true
+
+nv t1
+--------------------------- E-IsZeroSucc
+iszero (succ t1) -> false
+
+t1 -> t1'
+------------------ E-IsZero
+iszero t1 -> iszero t1'
+
+
+// Typing: a relation on a term and a type
+judgment typing: t : T
+
+----------- T-True
+true : Bool
+
+------------ T-False
+false : Bool
+
+t1 : Bool
+t2 : T
+t3 : T
+------------------------- T-If
+if t1 then t2 else t3 : T
+
+------- T-Zero
+0 : Nat
+
+  t1 : Nat
+------------- T-Succ
+succ t1 : Nat
+
+  t1 : Nat
+------------- T-Pred
+pred t1 : Nat
+
+   t1 : Nat
+---------------- T-IsZero
+iszero t1 : Bool
+
+
+/*
+4. Basic proofs
+*/
+
+
+// Show that term "pred (succ (pred 0))" evaluates in one step to
+// "pred (succ 0)". Example on page 41.
+
+/*
+All we have to do is to build the right derivation, a derivation that ends
+with the result we are to prove.
+Each subderivation gets a name, so that we can refer to it.
+The last derivation is the judgment under exists.
+*/
+lemma step1:
+    exists pred (succ (pred 0)) -> pred (succ 0)
+    d1: pred 0 -> 0 by rule E-PredZero
+    d2: succ (pred 0) -> succ 0 by rule E-Succ on d1
+    d3: pred (succ (pred 0)) -> pred (succ 0) by rule E-Pred on d2
+end lemma
+
+/*
+The last line of the proof ('d3: ...') duplicates the judgment under exists.
+It can thus be simplified as below.
+*/
+lemma step1-shorter:
+    exists pred (succ (pred 0)) -> pred (succ 0)
+    d1: pred 0 -> 0 by rule E-PredZero
+    d2: succ (pred 0) -> succ 0 by rule E-Succ on d1
+    proof by rule E-Pred on d2
+end lemma
+
+// Show that every subterm of a well-typed term is well-typed.
+// Exercise 8.2.3
+
+/*
+Here we have to provide a separate lemma for each term in the syntax of terms.
+We show the cases for succ and if, the others are similar.
+This lemma reads "if succ t : T, then t: T'".
+The "if" part goes into the forall, the "then" part into exists.
+The terms or judgments in the forall part must be named, we usually use
+letter 'p' (for premise), but any label will do. Those in the exists part
+need no name.
+The proof proceeds by analysing *all* possible rules whose conclusion
+matches the hypothesis p, that is "succ t : T".
+*/
+lemma subterm-of-succ-is-typable:
+    forall p: succ t : T
+    exists t : T'
+    proof by case analysis on p:
+        case rule
+              d: t1 : Nat
+            ---------------- T-Succ
+            _: succ t1 : Nat
+        is
+            proof by d
+        end case
+    end case analysis
+end lemma
+
+/*
+In the above proof, only *one* rule is applicable. In this case we can
+invert the rule, starting from the conclusion "succ t1 : Nat" we obtain
+"t1 : Nat". And this is exactly the proof we are looking for.
+*/
+lemma subterm-of-succ-is-typable-using-inversion:
+    forall p: succ t : T
+    exists t : T'
+    proof by inversion on p
+end lemma
+
+/*
+A lemma has a single "exists"; several results are combined with "and".
+*/
+lemma subterms-of-if-are-typable:
+    forall p: if t1 then t2 else t3 : T
+    exists t1 : T1 and t2 : T2 and t3 : T3
+    proof by inversion on p
+end lemma
+
+// Write a term that evaluates to a value, yet is not typable.
+
+/*
+We need two separate lemmas: one for the "positive" part,
+the other for the "negative" part.
+We choose a term and use it in both results: "if true then 0 else false".
+*/
+lemma evals-to-a-value:
+    exists t -> t' and value t'
+    d1: if true then 0 else false -> 0 by rule E-IfTrue
+    d2: nv 0 by rule nv-zero
+    d3: value 0 by rule value-nv on d2
+    proof by d1, d3 // d1 is a proof of "t -> t'" and d3 of "value t'"
+end lemma
+
+
+/*
+5. Using "contradiction"
+*/
+
+
+/*
+Now we show that "if true then 0 else false : T" does *not* hold.
+There is no means of saying that given elements are *not* in a relation.
+We instead say the following: from "if true then 0 else false : T" a
+contradiction follows. This is justified, for example, by the following
+equivalences:
+    p implies False   is equivalent to   (not p) or False   is equivalent to   not p
+
+Notice the use of "and" to name the three premises of derivation p at once.
+*/
+lemma yet-untypable:
+    forall p: if true then 0 else false : T
+    exists contradiction
+    _: true : Bool and d2: 0 : T and d3: false : T by inversion on p
+    use inversion on d2
+    /*
+    Why 'use inversion'?
+    d2 is 0 : T, and the only rule that concludes 0 : ... is T-Zero:
+
+    ------- T-Zero
+    0 : Nat
+
+    T-Zero has no premises, so there is nothing to name. What inversion does
+    give us is that the conclusion 0 : Nat must match 0 : T, so T = Nat.
+    use inversion on d2 records that equation, and SASyLF substitutes Nat for T
+    in everything in scope. In particular "d3: false : T"
+    becomes "d3: false : Nat".
+    */
+    proof by case analysis on d3:
+    end case analysis
+end lemma
+
+/*
+The above proof ended by analysing *all* possible rules that conclude
+"d3: false : Nat". When there are no rules that apply, one can use
+"proof by contradiction".
+*/
+lemma yet-untypable-using-contradiction:
+    forall p: if true then 0 else false : T
+    exists contradiction
+    _: true : Bool and d2: 0 : T and d3: false : T by inversion on p
+    use inversion on d2
+    proof by contradiction on d3
+end lemma
+
+
+/*
+6. Proofs by induction
+
+"proof by induction on p:" is very much like
+"proof by case analysis on p:". The difference is that,
+in the former, we may use the induction hypothesis. For example:
+"ih: t1 : Nat by induction hypothesis on d1".
+*/
+
+
+lemma numerical-values-are-nat:
+    forall p: nv t
+    exists t : Nat
+    proof by induction on p:
+        case rule
+            ---- nv-zero
+            _: nv 0
+        is
+            proof by rule T-Zero
+        end case
+        case rule
+            d1: nv t1
+            --------- nv-succ
+            _: nv succ t1
+        is
+            ih: t1 : Nat by induction hypothesis on d1
+            proof by rule T-Succ on ih
+        end case
+    end induction
+end lemma
+
+/*
+Theorem 8.3.3. Preservation
+
+The proof is long, but simple.
+We proceed by induction on "t : T" and analyse all rules.
+In each case two things can happen:
+- No evaluation rule applies (values do not reduce) --> contradiction on p2
+- One or more evaluation rules apply --> we analyse them all
+*/
+
+theorem preservation:
+    forall p1: t : T
+    forall p2: t -> t'
+    exists t' : T
+    proof by induction on p1:
+    // Case T-True
+        case rule
+            ----------- T-True
+            _: true : Bool
+        is
+            proof by contradiction on p2 // "t = true" does not evaluate
+        end case
+    // Case T-False
+        case rule
+            ------------ T-False
+            _: false : Bool
+        is
+            proof by contradiction on p2
+        end case
+    // Case T-If
+        case rule
+            d1: t1 : Bool
+            d2: t2 : T
+            d3: t3 : T
+            ------------------------- T-If
+            _: if t1 then t2 else t3 : T
+        is
+            // There are three evaluation rules for "t = if t1 then t2 else t3"
+            proof by case analysis on p2:
+                case rule
+                    ------------------------------ E-IfTrue
+                    _: if true then t2 else t3 -> t2
+                is
+                    proof by d2
+                end case
+                case rule
+                    ------------------------------- E-IfFalse
+                    _: if false then t2 else t3 -> t3
+                is
+                    proof by d3
+                end case
+                case rule
+                            d4: t1 -> t1'
+                    ------------------------------------------------ E-If
+                    _: if t1 then t2 else t3 -> if t1' then t2 else t3
+                is
+                    d5: t1' : Bool by induction hypothesis on d1, d4
+                    proof by rule T-If on d5, d2, d3
+                end case
+            end case analysis
+        end case
+    // Case T-Zero
+        case rule
+            ------- T-Zero
+            _: 0 : Nat
+        is
+            proof by contradiction on p2
+        end case
+    // Case T-Succ
+        case rule
+            d1: t1 : Nat
+            ------------- T-Succ
+            _: succ t1 : Nat
+        is
+            proof by case analysis on p2:
+                case rule
+                    d2: t1 -> t1'
+                    ------------------ E-Succ
+                    _: succ t1 -> succ t1'
+                is
+                    d3: t1' : Nat by induction hypothesis on d1, d2
+                    proof by rule T-Succ on d3
+                end case
+            end case analysis
+        end case
+    // Case T-Pred
+        case rule
+            d1: t1 : Nat
+            ------------- T-Pred
+            _: pred t1 : Nat
+        is
+            proof by case analysis on p2:
+                case rule
+                    ------------ E-PredZero
+                    _: pred 0 -> 0
+                is
+                    proof by rule T-Zero
+                end case
+                case rule
+                    d2: nv t2
+                    ---------------------- E-PredSucc
+                    _: pred (succ t2) -> t2
+                is
+                    d3: t2 : Nat by lemma numerical-values-are-nat on d2
+                    proof by d3
+                end case
+                case rule
+                    d2: t1 -> t1'
+                    ------------------ E-Pred
+                    _: pred t1 -> pred t1'
+                is
+                    d3: t1' : Nat by induction hypothesis on d1, d2
+                    proof by rule T-Pred on d3
+                end case
+            end case analysis
+        end case 
+    // Case T-IsZero
+        case rule
+            d1: t1 : Nat
+            ---------------- T-IsZero
+            _: iszero t1 : Bool
+        is
+            proof by case analysis on p2:
+                case rule
+                    ----------------- E-IsZeroZero
+                    _: iszero 0 -> true
+                is
+                    proof by rule T-True
+                end case
+                case rule
+                    d2: nv t2
+                    --------------------------- E-IsZeroSucc
+                    _: iszero (succ t2) -> false
+                is
+                    proof by rule T-False
+                end case
+                case rule
+                    d2: t1 -> t1'
+                    ------------------ E-IsZero
+                    _: iszero t1 -> iszero t1'
+                is
+                    d3: t1' : Nat by induction hypothesis on d1, d2
+                    proof by rule T-IsZero on d3
+                end case
+            end case analysis
+        end case
+    end induction
+end theorem
+
+
+/*
+7. Term equality
+*/
+
+
+judgment term-eq: t = t
+
+------ eq
+t = t
+
+/*
+Term equality is used to force unification of terms,
+for example to obtain "t = true", when we know "value t" and "value true".
+
+We use equality in the proof of Lemma 8.3.1 [Canonical Forms]:
+1. If v is a value of type Bool, then v is either true or false.
+2. If v is a value of type Nat, then v is a numeric value.
+
+We prove the two results separately:
+- lemma canonical-forms-bool
+- lemma canonical-forms-nat
+*/
+
+/*
+Notice that the lemma concludes with a disjunction: this or that.
+"proof by d" works when d derives one disjunct. Here we have two, hence
+we must make explicit which disjunct (t = true or t = false) we are proving.
+For example, in the first case we conclude the proof
+with "_: t = true by rule eq".
+*/
+lemma canonical-forms-bool:
+    forall p1: value t
+    forall p2: t : Bool
+    exists t = true or t = false
+    proof by case analysis on p1:
+        case rule
+            ---------- value-true
+            _: value true
+        is
+            // Use equality to force t = true, thus fulfilling the first
+            // disjunct of the conclusion
+            _: t = true by rule eq
+        end case
+        case rule
+            ---------- value-false
+            _: value false
+        is  
+            // Use equality to force t = false, thus fulfilling the second
+            // disjunct of the conclusion
+            _: t = false by rule eq
+        end case
+        case rule
+            d: nv t
+            ------- value-nv
+            _: value t
+        is
+            proof by case analysis on d:
+                case rule
+                    ---- nv-zero
+                    _: nv 0
+                is
+                    proof by contradiction on p2
+                end case
+                case rule
+                    _: nv t'
+                    --------- nv-succ
+                    _: nv succ t'
+                is
+                    proof by contradiction on p2
+                end case
+            end case analysis
+        end case
+    end case analysis
+end lemma
+
+lemma canonical-forms-nat:
+    forall p1: value t
+    forall p2: t : Nat
+    exists nv t
+    proof by case analysis on p1:
+        case rule 
+            ---------- value-true
+            _: value true
+        is
+            proof by contradiction on p2
+        end case
+        case rule
+            ---------- value-false
+            _: value false
+        is
+            proof by contradiction on p2
+        end case
+        case rule
+            d: nv t
+            ---------- value-nv
+            _: value t
+        is
+            proof by case analysis on d:
+                case rule
+                    ---- nv-zero
+                    _: nv 0
+                is
+                    proof by rule nv-zero
+                end case
+                case rule
+                    d2: nv t'
+                    --------- nv-succ
+                    _: nv succ t'
+                is
+                    proof by rule nv-succ on d2
+                end case
+            end case analysis
+        end case
+    end case analysis
+end lemma
+
+/*
+Theorem 8.3.2. Progress
+
+This is the longest proof in this section. Again, it is by induction on the
+derivation of "t : T", hence we analyse each typing rule in turn.
+*/
+theorem progress:
+    forall p: t : T
+    exists value t or t -> t'
+    proof by induction on p:
+    // Case T-True
+        case rule
+            ----------- T-True
+            _: true : Bool
+        is
+            _: value t by rule value-true
+            // "proof by rule value-true" would be rejected:
+            // the rule concludes "value true", not the disjunction
+        end case
+    // Case T-False
+        case rule
+            ----------- T-False
+            _: false : Bool
+        is
+            _: value t by rule value-false
+        end case
+    // Case T-If
+        case rule
+            d1: t1 : Bool
+            d2: t2 : T
+            d3: t3 : T
+            ------------------------- T-If
+            _: if t1 then t2 else t3 : T
+        is
+            ih: value t1 or t1 -> t1' by induction hypothesis on d1
+            proof by case analysis on ih:
+                case or ih1: value t1 is
+                    cn: t1 = true or t1 = false by lemma canonical-forms-bool on ih1, d1
+                    proof by case analysis on cn:
+                        case or e: t1 = true is
+                            // The purpose of 'use inversion' below is to instantiate t1 with true,
+                            // so that t becomes 'if true then t2 else t3' and rule E-IfTrue applies.
+                            use inversion on e
+                            _: t -> t2 by rule E-IfTrue
+                            /*
+                            The long version of the two lines above:
+                            proof by case analysis on e:
+                                case rule
+                                    ----------- eq
+                                    _: true = true
+                                is
+                                    _: t -> t2 by rule E-IfTrue
+                                end case
+                            end case analysis
+                            */
+                        end case
+                        case or e: t1 = false is
+                            use inversion on e
+                            _: t -> t3 by rule E-IfFalse
+                        end case
+                    end case analysis
+                end case
+                case or ih2: t1 -> t1' is
+                    _: t -> if t1' then t2 else t3 by rule E-If on ih2
+                end case
+            end case analysis
+        end case
+    // Case T-Zero
+        case rule
+            ------- T-Zero
+            _: 0 : Nat
+        is
+            d: nv 0 by rule nv-zero
+            _: value t by rule value-nv on d
+        end case
+    // Case T-Succ
+        case rule
+              d1: t1 : Nat
+            ------------- T-Succ
+            _: succ t1 : Nat
+        is
+            ih: value t1 or t1 -> t1' by induction hypothesis on d1
+            proof by case analysis on ih:
+                case or ih1: value t1 is
+                    d2: nv t1 by lemma canonical-forms-nat on ih1, d1
+                    d3: nv t by rule nv-succ on d2
+                    _: value t by rule value-nv on d3
+                end case
+                case or ih2: t1 -> t1' is
+                    _: t -> succ t1' by rule E-Succ on ih2
+                end case
+            end case analysis
+        end case
+    // Case T-Pred
+        case rule
+              d1: t1 : Nat
+            ------------- T-Pred
+            _: pred t1 : Nat
+        is
+            ih: value t1 or t1 -> t1' by induction hypothesis on d1
+            proof by case analysis on ih:
+                case or ih1: value t1 is
+                    d2: nv t1 by lemma canonical-forms-nat on ih1, d1
+                    proof by case analysis on d2:
+                        case rule
+                            ---- nv-zero
+                            _: nv 0
+                        is
+                            _: t -> 0 by rule E-PredZero
+                        end case
+                        case rule
+                            d3: nv t2
+                            --------- nv-succ
+                            _: nv succ t2
+                        is
+                            _: t -> t2 by rule E-PredSucc on d3
+                        end case
+                    end case analysis
+                end case
+                case or ih2: t1 -> t1' is
+                    _: t -> pred t1' by rule E-Pred on ih2
+                end case
+            end case analysis
+        end case
+    // Case T-IsZero
+        case rule
+            d1: t1 : Nat
+            ---------------- T-IsZero
+            _: iszero t1 : Bool
+        is
+            ih: value t1 or t1 ->t1' by induction hypothesis on d1
+            proof by case analysis on ih:
+                case or ih1: value t1 is 
+                    d2: nv t1 by lemma canonical-forms-nat on ih1, d1
+                    proof by case analysis on d2:
+                        case rule 
+                            ---- nv-zero
+                            _: nv 0
+                        is
+                            _: t -> true by rule E-IsZeroZero
+                        end case
+                        case rule
+                            d3: nv t2
+                            --------- nv-succ
+                            _: nv succ t2
+                        is
+                            _: t -> false by rule E-IsZeroSucc on d3
+                        end case
+                end case analysis
+                end case
+                case or ih2: t1 -> t1' is
+                    _: t -> iszero t1' by rule E-IsZero on ih2
+                end case
+            end case analysis
+        end case
+    end induction
+end theorem
+
+
+/*
+8. Type equality
+*/
+
+
+judgment type-eq: T ~ T
+
+------ eq-type
+T ~ T
+
+/*
+8.2.4 Theorem [Uniqueness of Types]
+*/
+lemma uniqueness-of-types:
+    forall p1: t : T1
+    forall p2: t : T2
+    exists T1 ~ T2
+    proof by induction on p1:
+        case rule
+            ----------- T-True
+            _: true : Bool
+        is
+            proof by unproved
+        end case
+        case rule
+            ------------ T-False
+            _: false : Bool
+        is
+            proof by unproved
+        end case
+        case rule
+            d1: t1 : Bool
+            d2: t2 : T1
+            d3: t3 : T1
+            ------------------------- T-If
+            _: if t1 then t2 else t3 : T1
+        is
+            proof by unproved
+        end case
+        case rule
+            ------- T-Zero
+            _: 0 : Nat
+        is
+            proof by unproved
+        end case
+        case rule
+            d1: t1 : Nat
+            ------------- T-Succ
+            _: succ t1 : Nat
+        is
+            proof by unproved
+        end case
+        case rule
+            d1: t1 : Nat
+            ------------- T-Pred
+            _: pred t1 : Nat
+        is
+            proof by unproved
+        end case
+        case rule
+            d1: t1 : Nat
+            ---------------- T-IsZero
+            _: iszero t1 : Bool
+        is
+            proof by unproved
+        end case
+    end induction
+end lemma
