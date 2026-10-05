@@ -21,7 +21,7 @@ Vasco T. Vasconcelos
 
 
 terminals
-    true false if then else succ pred iszero max// terms
+    true false if then else succ pred iszero max even odd // terms
     Bool Nat // types
     value nv // judgment names
 
@@ -29,12 +29,11 @@ terminals
 2. The syntax for terms and types
 */
 syntax
-    t ::=  true  |  false  |  if t then t else t
-         |    0  |  succ t |  pred t  |  iszero t | t max t
+    t ::=  true   |  false   |  if t then t else t
+         |    0   |  succ t  |  pred t  |  iszero t | t max t
 
 syntax
     T ::=  Bool  |  Nat
-
 
 /*
 3. Judgments
@@ -54,6 +53,29 @@ nv t
 --------- nv-succ
 nv succ t
 
+// Parity judgments
+judgment even-term: even t
+
+---- even-zero
+even 0
+
+odd t
+--------- even-succ
+even (succ t)
+
+judgment odd-term: odd t
+
+even t
+-------- odd-succ
+odd (succ t)
+
+// The successor of the successor of an odd term is odd.
+lemma successor-of-successor-of-odd-is-odd:
+    forall p: odd t
+    exists odd (succ (succ t))
+    d: even (succ t) by rule even-succ on p
+    proof by rule odd-succ on d
+end lemma
 
 // Predicate value: a predicate on terms
 judgment value-term: value t
@@ -74,7 +96,6 @@ judgment step: t -> t
 
 ------------------------------ E-IfTrue
 if true then t2 else t3 -> t2
-
 
 ------------------------------- E-IfFalse
 if false then t2 else t3 -> t3
@@ -130,6 +151,7 @@ t1 max t2 -> t1' max t2
 t2 -> t2'
 -------------------------- E-MaxR
 t1 max t2 -> t1 max t2'
+
 
 
 // Typing: a relation on a term and a type
@@ -491,6 +513,59 @@ theorem preservation:
                 end case
             end case analysis
         end case
+    // Case T-Max
+        case rule
+            d1: t1 : Nat
+            d2: t2 : Nat
+            ---------------- T-Max
+            _: t1 max t2 : Nat
+        is
+            proof by case analysis on p2:
+                case rule
+                    d3 : nv t2
+                    -------------------------- E-MaxZeroL
+                    _: 0 max t2 -> t2
+                is
+                    d4: t2 : Nat by lemma numerical-values-are-nat on d3
+                    proof by d4
+                end case
+                case rule
+                    d3 : nv t1
+                    -------------------------- E-MaxZeroR
+                    _: t1 max 0 -> t1
+                is
+                    d4: t1 : Nat by lemma numerical-values-are-nat on d3
+                    proof by d4
+                end case
+                case rule
+                    d3 : nv t3
+                    d4 : nv t4
+                    -------------------------- E-MaxSucc
+                    _: (succ t3) max (succ t4) -> succ (t3 max t4)
+                    is
+                    d5: t3 : Nat by lemma numerical-values-are-nat on d3
+                    d6: t4 : Nat by lemma numerical-values-are-nat on d4
+                    d7: t3 max t4 : Nat by rule T-Max on d5, d6
+                    proof by rule T-Succ on d7
+                end case
+                case rule
+                    d3: t1 -> t1'
+                    -------------------------- E-MaxL
+                    _: t1 max t2 -> t1' max t2
+                is
+                    d4: t1' : Nat by induction hypothesis on d1, d3
+                    proof by rule T-Max on d4, d2
+                end case
+                case rule
+                    d3: t2 -> t2'
+                    -------------------------- E-MaxR
+                    _: t1 max t2 -> t1 max t2'
+                is
+                    d4: t2' : Nat by induction hypothesis on d2, d3
+                    proof by rule T-Max on d1, d4
+                end case
+            end case analysis
+        end case
     end induction
 end theorem
 
@@ -766,9 +841,64 @@ theorem progress:
                 end case
             end case analysis
         end case
+    // Case T-Max
+        case rule
+            d1: t1 : Nat
+            d2: t2 : Nat
+            ---------------- T-Max
+            _: t1 max t2 : Nat
+        is
+            ih1: value t1 or t1 -> t1' by induction hypothesis on d1
+            ih2: value t2 or t2 -> t2' by induction hypothesis on d2
+            proof by case analysis on ih1:
+                case or ih1a: value t1 is
+                    d3: nv t1 by lemma canonical-forms-nat on ih1a, d1
+                    proof by case analysis on ih2:
+                        case or ih2a: value t2 is
+                            d4: nv t2 by lemma canonical-forms-nat on ih2a, d2
+                            proof by case analysis on d3:
+                                case rule
+                                    ---- nv-zero
+                                    _: nv 0
+                                is
+                                    _: t -> t2 by rule E-MaxZeroL on d4
+                                end case
+                                case rule
+                                    d5: nv t3
+                                    --------- nv-succ
+                                    _: nv succ t3
+                                is
+                                    proof by case analysis on d4:
+                                        case rule
+                                            ---- nv-zero
+                                            _: nv 0
+                                        is
+                                            _: t -> succ t3 by rule E-MaxZeroR on d3
+                                        end case
+                                        case rule
+                                            d6: nv t4
+                                            --------- nv-succ
+                                            _: nv succ t4
+                                        is
+                                            _: t -> succ (t3 max t4)
+                                                by rule E-MaxSucc on d5, d6
+                                        end case
+                                    end case analysis
+                                end case
+                            end case analysis
+                        end case
+                        case or ih2b: t2 -> t2' is
+                            _: t -> t1 max t2' by rule E-MaxR on ih2b
+                        end case
+                    end case analysis
+                end case
+                case or ih1b: t1 -> t1' is
+                    _: t -> t1' max t2 by rule E-MaxL on ih1b
+                end case
+            end case analysis
+        end case
     end induction
 end theorem
-
 
 /*
 8. Type equality
@@ -836,5 +966,30 @@ lemma uniqueness-of-types:
         is
             proof by unproved
         end case
+        case rule
+            d1: t1 : Nat
+            d2: t2 : Nat
+            ---------------- T-Max
+            _: t1 max t2 : Nat
+        is
+            proof by unproved
+        end case
     end induction
+end lemma
+
+// The successor of the successor of an odd term is odd
+lemma successor-of-successor-of-odd-turns-odd:
+    forall p: odd t
+    exists odd (succ (succ t))
+    d: even (succ t) by rule even-succ on p
+    proof by rule odd-succ on d
+end lemma
+
+// The successor of the successor of the successor of an even term is odd
+lemma successor-of-successor-of-successor-of-even-turns-odd:
+    forall p: even t
+    exists odd (succ (succ (succ t)))
+    d1: odd (succ t) by rule odd-succ on p
+    d2: even (succ (succ t)) by rule even-succ on d1
+    proof by rule odd-succ on d2
 end lemma
