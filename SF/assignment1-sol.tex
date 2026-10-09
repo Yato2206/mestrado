@@ -1,0 +1,96 @@
+1.
+===========================================================
+Exercise 1.1
+===========================================================
+{true}                                 // GIVEN PRECONDITION
+if a>=b && a>=c then                   // CONDITIONAL
+    {true && a>=b && a>=c}
+    -> 
+    {a>=a && a>=b && a>=c}          // ASSIGNMENT
+    max := a;
+    {max>=a && max>=b && max>=c}       
+else
+    {true && !(a>=b && a>=c)} = {a<b || a<c}
+    if b>=a && b>=c then               // CONDTIONAL
+        {(a<b || a<c) && b>=a && b>=c}
+        -> 
+        {b>=a && b>=b && b>=c}      // ASSIGNMENT
+        max := b;
+        {max>=a && max>=b ∧ max>=c}
+    else
+        {(a<b || a<c) && !(b>=a && b>=c)}
+        -> 
+        {c>=a && c>=b && c>=c}      // ASSIGNMENT
+        max := c;
+        {max>=a && max>=b ∧ max>=c}
+{max ≥ a ∧ max ≥ b ∧ max ≥ c}          // GIVEN POSCONDITION
+
+===========================================================
+Exercise 1.2
+===========================================================
+O triplo do exercício 1.1 é impreciso porque max pode ser qualquer valor desde que seja maior que a, b e c.
+Solução: max tem de ser ou a, ou b ou c.
+
+Triplo: {true} P {(max=a || max=b || max=c) && max>=a && max>=b && max>=c}
+
+2.
+===========================================================
+Exercise 2.1
+===========================================================
+{n>=1}                                  // GIVEN PREDCONDITION
+->                                  
+9 = 10-1 && 1<=n                        
+i := 1;
+9 = (10^i)-1 && i<=n                    // ASSIGNMENT
+r := 9;
+r = (10^i)-1 && i<=n                    // INVARIANT
+while i < n do
+    {r = (10^i)-1 && i<=n && i<n}       // INVARIANT && GUARD
+    -> 
+    {r*10+9 = (10^(i+1))-1 && i+1<=n}   
+    r := r*10+9;
+    {r = (10^(i+1))-1 && i+1<=n}        // ASSIGNMENT
+    i := i+1;
+    {r = (10^i)-1 && i<=n}              // INVARIANT
+{r = (10^i)-1 && i<=n && !(i<n)}        // INVARIANT && !GUARD
+-> 
+{r = (10^n)-1}
+
+===========================================================
+Exercise 2.2
+===========================================================
+O triplo continua válido. Pelo exercício anterior, provou-se que o triplo {n>=1} P {r=(10^n)-1} é válido. A condição mais forte (n>1) => 
+a condição mais fraca (n>=1), já que > implica >=.
+Assim, do conjunto de valores que satisfazem a condição mais fraca, existirá um subconjunto que satisfaz a condição mais forte.
+Pela left strenghening rule (φ → φ′ {φ′} S {ψ} LS | {φ} S {ψ}), com φ sendo a pré-condição mais forte e φ' a mais fraca, prova-se que o triplo continua 
+válido com a pré-condição n>1.
+
+===========================================================
+Exercise 2.3
+===========================================================
+(1) n-i is a variant
+{r = (10^i)-1 && i<=n && i<n && n-i = v} // INVARIANT && GUARD && v=e
+->
+{n-(i+1) < v}                            //ASSIGNMENT
+r := r*10+9;
+{n-(i+1) < v}                            //ASSIGNMENT
+i := i+1;
+{n-i < v}                                // v > e
+
+(2) n-i não sai dos números naturais
+r = (10^i)-1 && i<=n -> n-i>=0  				//INVARIANT -> e >= 0
+
+3.
+===========================================================
+Exercise 3
+===========================================================
+O forward axiom tem um problema quando x ocorre em e: a pós-condição x=e nunca substitui e,
+deixando-o para ser avaliado no pós-estado, exatamente como x. Isto não é correto, porque o
+valor de e usado para calcular o novo x foi determinado no pré-estado, não no pós-estado, o que pode levar a incoenrências, como
+no caso considerado. Neste caso, esta discrepância pode tornar a pós-condição contraditória, como
+por exemplo, com x:=x+1, em que a pós-condição x=e torna-se x=x+1, avaliada inteiramente com o novo
+valor de x — e nenhum valor de x satisfaz esta igualdade, logo o triplo {true} x:=x+1 {x=x+1}
+não é válido, apesar de ser uma instância do forward axiom. O backward axiom conserta isto substituindo e por x, na pós-condição Q, formando a pré-condição Q[e/x], avaliada no 
+pré-estado, tal como e foi de facto avaliado pela atribuição.
+Isto garante que não há desencontro de estados, e portanto o axioma é correto mesmo quando
+x ocorre em e.
