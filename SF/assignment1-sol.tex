@@ -2,28 +2,28 @@
 ===========================================================
 Exercise 1.1
 ===========================================================
-{true}                                 // GIVEN PRECONDITION
-if a>=b && a>=c then                   // CONDITIONAL
+{true}                                  // GIVEN PRECONDITION
+if a>=b && a>=c then                    // CONDITIONAL
     {true && a>=b && a>=c}
     -> 
-    {a>=a && a>=b && a>=c}          // ASSIGNMENT
+    {a>=a && a>=b && a>=c}              // ASSIGNMENT
     max := a;
     {max>=a && max>=b && max>=c}       
 else
     {true && !(a>=b && a>=c)} = {a<b || a<c}
-    if b>=a && b>=c then               // CONDTIONAL
+    if b>=a && b>=c then                // CONDTIONAL
         {(a<b || a<c) && b>=a && b>=c}
         -> 
-        {b>=a && b>=b && b>=c}      // ASSIGNMENT
+        {b>=a && b>=b && b>=c}          // ASSIGNMENT
         max := b;
         {max>=a && max>=b ∧ max>=c}
     else
         {(a<b || a<c) && !(b>=a && b>=c)}
         -> 
-        {c>=a && c>=b && c>=c}      // ASSIGNMENT
+        {c>=a && c>=b && c>=c}          // ASSIGNMENT
         max := c;
         {max>=a && max>=b ∧ max>=c}
-{max ≥ a ∧ max ≥ b ∧ max ≥ c}          // GIVEN POSCONDITION
+{max ≥ a ∧ max ≥ b ∧ max ≥ c}           // GIVEN POSCONDITION
 
 ===========================================================
 Exercise 1.2
@@ -37,13 +37,13 @@ Triplo: {true} P {(max=a || max=b || max=c) && max>=a && max>=b && max>=c}
 ===========================================================
 Exercise 2.1
 ===========================================================
-{n>=1}                                  // GIVEN PREDCONDITION
+{n>=1}                                  // GIVEN PRECONDITION
 ->                                  
-9 = 10-1 && 1<=n                        
+{9 = 10-1 && 1<=n}                        
 i := 1;
-9 = (10^i)-1 && i<=n                    // ASSIGNMENT
+{9 = (10^i)-1 && i<=n}                    // ASSIGNMENT
 r := 9;
-r = (10^i)-1 && i<=n                    // INVARIANT
+{r = (10^i)-1 && i<=n}                    // INVARIANT
 while i < n do
     {r = (10^i)-1 && i<=n && i<n}       // INVARIANT && GUARD
     -> 
