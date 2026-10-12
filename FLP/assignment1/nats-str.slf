@@ -1,0 +1,201 @@
+/*
+1. Identifiers required for syntax and judgments
+*/
+terminals
+    succ plus ε A B len //terms
+    Nat Str // types
+    value nv strv // judgment names
+
+/*
+2. The syntax for terms and types
+*/
+syntax  
+    e ::= 0 | succ e | e plus e | ε | A e | B e | len e
+
+syntax 
+    T ::= Nat | Str
+
+/*
+3. Judgments
+
+are composed of a declaration stating the name and the form of the judgment
+and zero or more rules.
+*/
+// Typing: a relation on a term and a type
+judgment typing: e : T
+
+------------- T-Zero
+0 : Nat
+
+e : Nat
+------------- T-Succ
+succ e : Nat
+
+e1 : Nat
+e2 : Nat
+------------- T-Plus
+e1 plus e2 : Nat
+
+------------- T-Empty
+ε : Str
+
+e : Str
+------------- T-A
+A e : Str
+
+e : Str
+------------- T-B
+B e : Str
+
+e : Str
+------------- T-Len
+len e : Nat
+
+// C
+
+// Typable
+
+// EXPRESSION:
+//      len (Aε) + len (Bε)
+
+// DERIVATION:
+//    ------ t-Empty           ------ t-Empty   
+//    ε: Str                   ε: Str  
+//   -------- t-A             -------- t-B
+//   Aε : Str                 Bε: Str
+// -------------- t-Len     -------------- t-Len
+// len (Aε) : Nat           len (Bε) : Nat
+// --------------------------------------- t-Plus
+//        len (Aε) + len (Bε) : Nat 
+
+// Untypable
+
+// EXPRESSION:
+// len (0 + succ 0)
+
+// DERIVATION: 
+
+//     ---------------------- IMPOSSIBLE TO DERIVE  
+//     (0    +   succ 0) : Str
+// ----------------------------- t-Len
+//      len (0 + succ 0) : Nat
+
+// Conclusion: untypable
+
+// D
+
+judgment type-eq: T ~ T
+
+------ eq-type
+T ~ T
+
+lemma uniqueness-of-types:
+    forall p1: e : T1
+    forall p2: e : T2
+    exists T1 ~ T2
+    proof by induction on p1:
+        case rule
+            ------------- T-Zero
+            _: 0 : Nat
+        is
+            proof by case analysis on p2:
+                case rule
+                    ------------- T-Zero
+                    _: 0 : Nat
+            is
+                proof by rule eq-type
+                end case
+            end case analysis
+        end case
+        case rule
+            d1: e1 : Nat
+            ------------- T-Succ
+            _: succ e1 : Nat
+        is
+            proof by case analysis on p2:
+                case rule
+                    d2: e1 : Nat
+                    ------------- T-Succ
+                    _: succ e1 : Nat
+            is
+                proof by rule eq-type
+                end case
+            end case analysis
+        end case
+        case rule
+            d1: e1 : Nat
+            d2: e2 : Nat
+            ------------- T-Plus
+            _: e1 plus e2 : Nat
+        is
+            proof by case analysis on p2:
+                case rule
+                    d3: e1 : Nat
+                    d4: e2 : Nat
+                    ------------- T-Plus
+                    _: e1 plus e2 : Nat
+            is
+                proof by rule eq-type
+                end case
+            end case analysis
+        end case
+        case rule
+            ------------- T-Empty
+            _: ε : Str
+        is
+            proof by case analysis on p2:
+                case rule
+                    ------------- T-Empty
+                    _: ε : Str
+            is
+                proof by rule eq-type
+                end case
+            end case analysis
+        end case
+        case rule
+            d1: e1 : Str
+            ------------- T-A
+            _: A e1 : Str
+        is
+            proof by case analysis on p2:
+                case rule
+                    d2: e1 : Str
+                    ------------- T-A
+                    _: A e1 : Str
+            is
+                proof by rule eq-type
+                end case
+            end case analysis
+        end case
+        case rule
+            d1: e1 : Str
+            ------------- T-B
+            _: B e1 : Str
+        is
+            proof by case analysis on p2:
+                case rule
+                    d2: e1 : Str
+                    ------------- T-B
+                    _: B e1 : Str
+            is
+                proof by rule eq-type
+                end case
+            end case analysis
+        end case
+        case rule
+            d1: e1 : Str
+            ------------- T-Len
+            _: len e1 : Nat
+        is
+            proof by case analysis on p2:
+                case rule
+                    d2: e2 : Str
+                    ------------- T-Len
+                    _: len e2 : Nat
+            is
+                proof by rule eq-type
+                end case
+            end case analysis
+        end case
+    end induction
+end lemma 
