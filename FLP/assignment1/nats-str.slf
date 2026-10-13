@@ -246,6 +246,10 @@ value e
 // one-step 
 judgment step: e -> e
 
+e1 -> e1'
+------------------ E-Succ
+succ e1 -> succ e1'
+
 nv e
 ------------------------------ E-PlusZero
 0 plus e -> e
@@ -264,6 +268,14 @@ nv e2
 ---------------------------------------- E-PlusSucc
 (succ e1) plus e2 -> succ (e1 plus e2)
 
+e1 -> e1'
+------------------------------ E-A
+A e1 -> A e1'
+
+e1 -> e1'
+------------------------------ E-B
+B e1 -> B e1'
+
 ------------------------------ E-LenEmpty
 len ε -> 0
 
@@ -275,6 +287,6 @@ str e
 ------------------------------ E-LenB
 len (B e) -> succ (len e)
 
-e -> e'
+e1 -> e1'
 ------------------------------ E-Len
-len e -> len e'
+len e1 -> len e1'
