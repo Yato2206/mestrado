@@ -1,10 +1,12 @@
+// 1
+
 /*
 1. Identifiers required for syntax and judgments
 */
 terminals
     succ plus ε A B len //terms
     Nat Str // types
-    value nv strv // judgment names
+    value nv str // judgment names
 
 /*
 2. The syntax for terms and types
@@ -199,3 +201,80 @@ lemma uniqueness-of-types:
         end case
     end induction
 end lemma 
+
+// 2
+
+// A
+// Predicate numerical values: a predicate on terms
+judgment numerical-values: nv e
+
+---- nv-zero
+nv 0
+
+nv e
+--------- nv-succ
+nv succ e
+
+// Predicate string values: a predicate on terms
+judgment string-values: str e
+
+---- str-empty
+str ε
+
+str e
+--------- str-A
+str A e
+
+str e
+--------- str-B
+str B e
+
+// Predicate value: a predicate on terms
+judgment value-term: value e
+
+  nv e
+------- value-nv
+value e
+
+  str e
+------- value-str
+value e
+
+// B
+
+// Evaluation: a relation on pairs of terms
+// one-step 
+judgment step: e -> e
+
+nv e
+------------------------------ E-PlusZero
+0 plus e -> e
+
+e1 -> e1'
+------------------------------ E-PlusLeft
+e1 plus e2 -> e1' plus e2
+
+nv e1
+e2 -> e2'
+------------------------------ E-PlusRight
+e1 plus e2 -> e1 plus e2'
+
+nv e1  
+nv e2
+---------------------------------------- E-PlusSucc
+(succ e1) plus e2 -> succ (e1 plus e2)
+
+------------------------------ E-LenEmpty
+len ε -> 0
+
+str e
+------------------------------ E-LenA
+len (A e) -> succ (len e)
+
+str e
+------------------------------ E-LenB
+len (B e) -> succ (len e)
+
+e -> e'
+------------------------------ E-Len
+len e -> len e'
