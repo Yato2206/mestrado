@@ -751,3 +751,216 @@ end theorem
     Pela contrapositiva, se e é forma normal mas não é value — como é o caso de succ ε —, então e não pode ser typable. 
     Logo, qualquer expressão com estas duas propriedades (forma normal e não-value) está automaticamente excluída de ser typable.
 */
+
+// H
+
+lemma numerical-values-are-nat:
+    forall p: nv e
+    exists e : Nat
+    proof by induction on p:
+        case rule
+            ---- nv-zero
+            _: nv 0
+        is
+            proof by rule T-Zero
+        end case
+        case rule
+            d1: nv e1
+            --------- nv-succ
+            _: nv succ e1
+        is
+            ih: e1 : Nat by induction hypothesis on d1
+            proof by rule T-Succ on ih
+        end case
+    end induction
+end lemma
+
+lemma string-values-are-str:
+    forall p: str e
+    exists e : Str
+    proof by induction on p:
+        case rule
+            ---- str-empty
+            _: str ε
+        is
+            proof by rule T-Empty
+        end case
+        case rule
+            d1: str e1
+            --------- str-A
+            _: str A e1
+        is
+            ih: e1 : Str by induction hypothesis on d1
+            proof by rule T-A on ih
+        end case
+        case rule
+            d1: str e1
+            --------- str-B
+            _: str B e1
+        is
+            ih: e1 : Str by induction hypothesis on d1
+            proof by rule T-B on ih
+        end case
+    end induction
+end lemma
+
+theorem preservation:
+    forall p1: e : T
+    forall p2: e -> e'
+    exists e' : T
+    proof by induction on p1:
+    // Case T-Zero
+        case rule
+            ------- T-Zero
+            _: 0 : Nat
+        is
+            proof by contradiction on p2
+        end case
+    // Case T-Succ
+        case rule
+            d1: e1 : Nat
+            ------------- T-Succ
+            _: succ e1 : Nat
+        is
+            proof by case analysis on p2:
+                case rule
+                    d2: e1 -> e1'
+                    ------------------ E-Succ
+                    _: succ e1 -> succ e1'
+                is
+                    d3: e1' : Nat by induction hypothesis on d1, d2
+                    proof by rule T-Succ on d3
+                end case
+            end case analysis
+        end case
+    // Case T-Plus
+        case rule 
+            d1: e1 : Nat
+            d2: e2 : Nat
+            ------------- T-Plus
+            _: e1 plus e2 : Nat
+        is
+            proof by case analysis on p2:
+                case rule 
+                    d3: nv e3
+                    ------------------------------ E-PlusZero
+                    _: 0 plus e3 -> e3
+                is
+                    d4: e3: Nat by lemma numerical-values-are-nat on d3  
+                    proof by d4
+                end case
+                case rule 
+                    d3: e1 -> e1'
+                    ------------------------------ E-PlusLeft
+                    _: e1 plus e2 -> e1' plus e2
+                is
+                    d4: e1': Nat by induction hypothesis on d1, d3
+                    proof by rule T-Plus on d4, d2  
+                end case
+                case rule 
+                    d3: nv e1
+                    d4: e2 -> e2'
+                    ------------------------------ E-PlusRight
+                    _: e1 plus e2 -> e1 plus e2'
+                is
+                    d5: e1: Nat by lemma numerical-values-are-nat on d3
+                    d6: e2': Nat by induction hypothesis on d2, d4
+                    proof by rule T-Plus on d1, d6  
+                end case
+                case rule 
+                    d3: nv e3  
+                    d4: nv e4
+                    ---------------------------------------- E-PlusSucc
+                    _: (succ e3) plus e4 -> succ (e3 plus e4)
+                is
+                    d5: e3 : Nat by lemma numerical-values-are-nat on d3
+                    d6: e4 : Nat by lemma numerical-values-are-nat on d4
+                    d7: e3 plus e4: Nat by rule T-Plus on d5, d6
+                    proof by rule T-Succ on d7 
+                end case
+            end case analysis
+        end case 
+    // Case T-Empty
+    case rule
+        ------------- T-Empty
+        _: ε : Str
+    is 
+        proof by contradiction on p2
+    end case
+    // Case T-A
+    case rule
+        d1: e1 : Str
+        ------------- T-A
+        _: A e1 : Str
+    is 
+        proof by case analysis on p2: 
+            case rule
+                d2: e1 -> e1'
+                ------------------------------ E-A
+                _: A e1 -> A e1'
+            is
+                d3: e1': Str by induction hypothesis on d1, d2
+                proof by rule T-A on d3
+            end case
+        end case analysis
+    end case
+    // Case T-B
+    case rule
+        d1: e1 : Str
+        ------------- T-B
+        _: B e1 : Str
+    is 
+        proof by case analysis on p2: 
+            case rule
+                d2: e1 -> e1'
+                ------------------------------ E-B
+                _: B e1 -> B e1'
+            is
+                d3: e1': Str by induction hypothesis on d1, d2
+                proof by rule T-B on d3
+            end case
+        end case analysis
+    end case
+    // Case T-Len
+        case rule 
+            d1: e1 : Str
+            ------------- T-Len
+            _: len e1 : Nat
+        is
+            proof by case analysis on p2:
+                case rule 
+                    ------------------------------ E-LenEmpty
+                    _: len ε -> 0
+                is
+                    proof by rule T-Zero  
+                end case
+                case rule 
+                    d2: str e2
+                    ------------------------------ E-LenA
+                    _: len (A e2) -> succ (len e2)
+                is
+                    d4: e2: Str by lemma string-values-are-str on d2
+                    d5: len e2: Nat by rule T-Len on d4
+                    proof by rule T-Succ on d5  
+                end case
+                case rule 
+                    d2: str e2
+                    ------------------------------ E-LenB
+                    _: len (B e2) -> succ (len e2)
+                is
+                    d4: e2: Str by lemma string-values-are-str on d2
+                    d5: len e2: Nat by rule T-Len on d4
+                    proof by rule T-Succ on d5  
+                end case
+                case rule 
+                    d2: e1 -> e1'
+                    ------------------------------ E-Len
+                    _: len e1 -> len e1'
+                is
+                    d3: e1': Str by induction hypothesis on d1, d2
+                    proof by rule T-Len on d3 
+                end case
+            end case analysis
+        end case 
+    end induction
+end theorem
