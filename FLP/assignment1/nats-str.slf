@@ -290,3 +290,464 @@ len (B e) -> succ (len e)
 e1 -> e1'
 ------------------------------ E-Len
 len e1 -> len e1'
+
+// C
+
+// e1 = 0 e e2 = succ 0
+lemma C1:
+    exists (succ 0) plus (succ 0) -> succ (0 plus succ (0))
+    d1: nv 0 by rule nv-zero
+    d2: nv (succ 0) by rule nv-succ on d1
+    proof by rule E-PlusSucc on d1, d2
+end lemma
+
+// 0 + succ 0 -> succ 0 
+lemma C2:
+    exists succ (0 plus (succ 0)) -> succ (succ 0)
+    d1: nv 0 by rule nv-zero
+    d2: nv (succ 0) by rule nv-succ on d1
+    d3: 0 plus succ 0 -> succ 0 by rule E-PlusZero on d2
+    proof by rule E-Succ on d3
+end lemma
+
+// e = Bε
+lemma C3:
+    exists len (A B ε) -> succ (len (B ε))
+    d1: str ε by rule str-empty
+    d2: str (B ε) by rule str-B on d1
+    proof by rule E-LenA on d2
+end lemma
+
+// e = ε
+lemma C4:
+    exists succ (len (B ε)) -> succ (succ (len ε))
+    d1: str ε by rule str-empty
+    d2: len (B ε) -> succ (len ε) by rule E-LenB on d1
+    proof by rule E-Succ on d2
+end lemma
+
+lemma C5:
+    exists (len (A ε)) plus (succ (succ 0)) -> (succ (len ε)) plus (succ (succ 0))
+    d1: str ε by rule str-empty
+    d2: len (A ε) -> succ (len ε) by rule E-LenA on d1
+    proof by rule E-PlusLeft on d2
+end lemma
+
+// D
+
+// O lemma ficaria muito grande sem lemmas de suporte.
+// 1º provar que nv são values e que str são values.~
+
+// If nv e and e -> e' (contradição, já que se e é um nv, não pode reduzir)
+lemma nv-is-a-normal-form:
+    forall p1: nv e
+    forall p2: e -> e'
+    exists contradiction
+    proof by induction on p1:
+        case rule
+            ---- nv-zero
+            _: nv 0
+        is 
+            proof by contradiction on p2
+        end case
+        case rule 
+            d1: nv e1
+            --------- nv-succ
+            _: nv succ e1
+        is
+            proof by case analysis on p2:
+                case rule
+                    d2: e2 -> e2'
+                    ------------------ E-Succ
+                    _: succ e2 -> succ e2'
+                is
+                    proof by induction hypothesis on d1, d2
+                end case
+            end case analysis
+        end case
+    end induction
+end lemma
+
+// If str e and e -> e' (contradição, já que se e é um str, não pode reduzir)
+lemma str-is-a-normal-form:
+    forall p1: str e
+    forall p2: e -> e'
+    exists contradiction
+    proof by induction on p1:
+        case rule
+            ---- str-empty
+            _: str ε 
+        is 
+            proof by contradiction on p2
+        end case
+        case rule 
+            d1: str e1
+            --------- str-A
+            _: str A e1
+        is
+            proof by case analysis on p2:
+                case rule
+                    d2: e2 -> e2'
+                    ------------------ E-A
+                    _: A e2 -> A e2'
+                is
+                    proof by induction hypothesis on d1, d2
+                end case
+            end case analysis
+        end case
+        case rule 
+            d1: str e1
+            --------- str-B
+            _: str B e1
+        is
+            proof by case analysis on p2:
+                case rule
+                    d2: e2 -> e2'
+                    ------------------ E-B
+                    _: B e2 -> B e2'
+                is
+                    proof by induction hypothesis on d1, d2
+                end case
+            end case analysis
+        end case
+    end induction
+end lemma
+
+// E
+
+// EXPRESSION:
+// succ ε
+// É uma normal form, já que não dá para reduzir, mas não é um value porque succ ε não é "válido". Succ espera um nv, não um str.~
+
+lemma succ-empty-str-is-a-normal-form:
+    forall p: succ ε -> e'
+    exists contradiction
+    proof by case analysis on p:
+        case rule
+            d1: ε -> e1'
+            ------------------ E-Succ
+            _: succ ε -> succ e1'
+        is
+            proof by case analysis on d1:
+            end case analysis
+        end case
+    end case analysis
+end lemma
+
+lemma succ-empty-str-is-not-a-value:
+    forall p: value (succ ε)
+    exists contradiction
+    proof by case analysis on p:
+    case rule
+            d: nv (succ ε)
+            --------- value-nv
+            _: value (succ ε)
+        is
+            proof by case analysis on d:
+                case rule
+                    d2: nv ε
+                    --------- nv-succ
+                    _: nv (succ ε)
+                is
+                    proof by case analysis on d2:
+                    end case analysis
+                end case
+            end case analysis
+        end case
+        case rule
+            d: str (succ ε)
+            --------- value-str
+            _: value (succ ε)
+        is
+            proof by case analysis on d:
+            end case analysis
+        end case
+    end case analysis
+end lemma
+
+// F
+
+lemma canonical-forms-nat:
+    forall p1: value e
+    forall p2: e : Nat
+    exists nv e
+    proof by case analysis on p1:
+        case rule
+            d1: nv e
+            ---------- value-nv
+            _: value e
+        is
+            proof by case analysis on d1:
+                case rule
+                    ---- nv-zero
+                    _: nv 0
+                is
+                    proof by rule nv-zero
+                end case
+                case rule
+                    d2: nv e'
+                    --------- nv-succ
+                    _: nv succ e'
+                is
+                    proof by rule nv-succ on d2
+                end case
+            end case analysis
+        end case
+        case rule
+            d1: str e
+            ------- value-str
+            _: value e
+        is
+            proof by case analysis on d1:
+                 case rule
+                    ---- str-empty
+                    _: str ε
+                is
+                    proof by contradiction on p2
+                end case
+                case rule
+                    d2: str e'
+                    --------- str-A
+                    _: str A e'
+                is
+                    proof by contradiction on p2
+                end case
+                case rule
+                    d2: str e'
+                    --------- str-B
+                    _: str B e'
+                is
+                    proof by contradiction on p2
+                end case
+            end case analysis
+        end case
+    end case analysis
+end lemma
+
+lemma canonical-forms-str:
+    forall p1: value e
+    forall p2: e : Str
+    exists str e
+    proof by case analysis on p1:
+        case rule
+            d1: nv e
+            ---------- value-nv
+            _: value e
+        is
+            proof by case analysis on d1:
+                case rule
+                    ---- nv-zero
+                    _: nv 0
+                is
+                    proof by contradiction on p2
+                end case
+                case rule
+                    d2: nv e'
+                    --------- nv-succ
+                    _: nv succ e'
+                is
+                    proof by contradiction on p2
+                end case
+            end case analysis
+        end case
+        case rule
+            d1: str e
+            ------- value-str
+            _: value e
+        is
+            proof by case analysis on d1:
+                case rule
+                    ---- str-empty
+                    _: str ε
+                is
+                    proof by rule str-empty
+                end case
+                case rule
+                    d2: str e'
+                    --------- str-A
+                    _: str A e'
+                is
+                    proof by rule str-A on d2
+                end case
+                case rule
+                    d2: str e'
+                    --------- str-B
+                    _: str B e'
+                is
+                    proof by rule str-B on d2
+                end case
+            end case analysis
+        end case
+    end case analysis
+end lemma
+
+theorem progress:
+    forall p: e : T
+    exists value e or e -> e'
+    proof by induction on p:
+    // Case T-Zero
+        case rule
+            ------------- T-Zero
+            _: 0 : Nat
+        is
+            d: nv 0 by rule nv-zero
+            _: value e by rule value-nv on d
+        end case
+    // Case T-Succ
+        case rule
+              d1: e1 : Nat
+            ------------- T-Succ
+            _: succ e1 : Nat
+        is
+            ih: value e1 or e1 -> e1' by induction hypothesis on d1
+            proof by case analysis on ih:
+                case or ih1: value e1 is
+                    d2: nv e1 by lemma canonical-forms-nat on ih1, d1
+                    d3: nv e by rule nv-succ on d2
+                    _: value e by rule value-nv on d3
+                end case
+                case or ih2: e1 -> e1' is
+                    _: e -> succ e1' by rule E-Succ on ih2
+                end case
+            end case analysis
+        end case
+    // Case T-Plus
+        case rule
+            d1: e1 : Nat
+            d2: e2 : Nat
+            ------------- T-Plus
+            _: e1 plus e2 : Nat
+        is
+            ih1: value e1 or e1 -> e1' by induction hypothesis on d1
+            ih2: value e2 or e2 -> e2' by induction hypothesis on d2
+            proof by case analysis on ih1:
+                case or ih1a: value e1 is
+                    d3: nv e1 by lemma canonical-forms-nat on ih1a, d1
+                    proof by case analysis on ih2:
+                        case or ih2a: value e2 is
+                            d4: nv e2 by lemma canonical-forms-nat on ih2a, d2
+                            proof by case analysis on d3:
+                                case rule
+                                    ---- nv-zero
+                                    _: nv 0
+                                is
+                                    _: e -> e2 by rule E-PlusZero on d4
+                                end case
+                                case rule
+                                    d5: nv e3
+                                    --------- nv-succ
+                                    _: nv succ e3
+                                is
+                                    _: e -> succ (e3 plus e2) by rule E-PlusSucc on d5, d4
+                                end case
+                            end case analysis
+                        end case
+                        case or ih2b: e2 -> e2' is
+                            _: e -> e1 plus e2' by rule E-PlusRight on d3, ih2b
+                        end case
+                    end case analysis
+                end case
+                case or ih1b: e1 -> e1' is
+                    _: e -> e1' plus e2 by rule E-PlusLeft on ih1b
+                end case
+            end case analysis
+        end case
+        // Case T-Empty
+        case rule
+            ------------- T-Empty
+            _: ε : Str
+        is
+            d: str ε by rule str-empty
+            _: value e by rule value-str on d
+        end case
+        // Case T-A
+        case rule
+              d1: e1 : Str
+            ------------- T-A
+            _: A e1 : Str
+        is
+            ih: value e1 or e1 -> e1' by induction hypothesis on d1
+            proof by case analysis on ih:
+                case or ih1: value e1 is
+                    d2: str e1 by lemma canonical-forms-str on ih1, d1
+                    d3: str e by rule str-A on d2
+                    _: value e by rule value-str on d3
+                end case
+                case or ih2: e1 -> e1' is
+                    _: e -> A e1' by rule E-A on ih2
+                end case
+            end case analysis
+        end case
+        // Case T-B
+        case rule
+              d1: e1 : Str
+            ------------- T-B
+            _: B e1 : Str
+        is
+            ih: value e1 or e1 -> e1' by induction hypothesis on d1
+            proof by case analysis on ih:
+                case or ih1: value e1 is
+                    d2: str e1 by lemma canonical-forms-str on ih1, d1
+                    d3: str e by rule str-B on d2
+                    _: value e by rule value-str on d3
+                end case
+                case or ih2: e1 -> e1' is
+                    _: e -> B e1' by rule E-B on ih2
+                end case
+            end case analysis
+        end case
+        // Case T-Len
+        case rule
+              d1: e1 : Str
+            ------------- T-Len
+            _: len e1 : Nat
+        is
+            ih: value e1 or e1 -> e1' by induction hypothesis on d1
+            proof by case analysis on ih:
+                case or ih1: value e1 is
+                    d2: str e1 by lemma canonical-forms-str on ih1, d1
+                    proof by case analysis on d2:
+                        case rule
+                            ---- str-empty
+                            _: str ε
+                        is
+                            _: e -> 0 by rule E-LenEmpty
+                        end case
+                        case rule
+                            d3: str e2'
+                            --------- str-A
+                            _: str A e2'
+                        is
+                            _: e -> succ (len e2') by rule E-LenA on d3
+                        end case
+                        case rule
+                            d3: str e2'
+                            --------- str-B
+                            _: str B e2'
+                        is
+                            _: e -> succ (len e2') by rule E-LenB on d3
+                        end case
+                    end case analysis
+                end case
+                case or ih2: e1 -> e1' is
+                    _: e -> len e1' by rule E-Len on ih2
+                end case
+            end case analysis
+        end case
+    end induction
+end theorem
+
+
+// G 
+
+/*
+    Queremos concluir que se e: t and e é uma normal form, então e é um value.
+    Prova: pelo teorma do progresso, sendo e: T, sabemos que e é um value ou existe um e' em que 
+    e -> e'. Se e é uma normal form, então e -> e' não é verdade. Se a segunda disjunção é falsa, então
+    a primeira tem de ser verdadeira, isto é, e é um value.
+    A expressão escolhida em 2.e não é typable, já que a única regra aplicável à expressão é a T-Succ, que exige que e seja um Nat, sendo
+    que ε é uma str, não podendo ter dois tipos, logo succ ε não é typable.
+    Seria impossível escolher uma expressão typable nestas condições: pelo corolário provado, se e é forma normal e e : T, então e tem de ser value.
+    Pela contrapositiva, se e é forma normal mas não é value — como é o caso de succ ε —, então e não pode ser typable. 
+    Logo, qualquer expressão com estas duas propriedades (forma normal e não-value) está automaticamente excluída de ser typable.
+*/
