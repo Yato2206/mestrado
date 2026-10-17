@@ -417,7 +417,7 @@ end lemma
 
 // EXPRESSION:
 // succ ε
-// É uma normal form, já que não dá para reduzir, mas não é um value porque succ ε não é "válido". Succ espera um nv, não um str.~
+// É uma normal form, já que não dá para reduzir, mas não é um value porque succ ε não é "válido". Succ espera um nv, não um str.
 
 lemma succ-empty-str-is-a-normal-form:
     forall p: succ ε -> e'

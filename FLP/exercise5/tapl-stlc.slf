@@ -1,0 +1,439 @@
+/*
+The Pure Simply Typed Lambda-Calculus
+Figure 9-1, page 103
+
+A SASyLF adaptation of some results in Types and Programming Languages
+(TAPL), by Benjamin Pierce, 2002, The MIT Press.
+
+Page numbers and references to exercises and results are from TAPL.
+
+Fundamentals of Programming Languages
+MSc in Informatics Engineering
+Faculty of Sciences
+University of Lisbon
+2026/2027
+Vasco T. Vasconcelos
+*/
+
+/*
+Notes on the encoding
+
+- Binding. A variable x is bound in a term by writing t[x] for the scope of
+  the binder, as in "lambda x : T . t[x]". The substitution [x |-> t2]t12
+  of TAPL is then written t12[t2]: no separate definition of substitution
+  is needed.
+
+- Values. TAPL uses a separate metavariable, v, for values. Here values are
+  given by a judgment, "value t", and each v in a rule of TAPL becomes
+  a premise of that form.
+
+- Base type. The types of Figure 9-1 have no base case, so there are no
+  types at all (and hence no well-typed terms; see Exercise 9.2.1).
+  SASyLF rejects such a syntax as unproductive. We add an uninterpreted
+  base type A, as in Figure 11-1.
+*/
+
+/*
+  2.
+  f x y = (f x) y
+  f x y: Bool
+  y tem de ser de um tipo (T2)
+  f x com o tipo T2 -> Bool (aplicando y dá Bool)
+  x tem de ser de um tipo (T1)
+  f tem de ser do tipo T1 -> T2 -> Bool, para aplicando x dê T2 -> Bool
+  Se T1 e T2 forem Bool
+  Derivação:
+
+  f:  Bool -> Bool -> Bool ∈ T            x: Bool ∈ T             
+----------------------------- T-Var   ------------------ T-Var      
+Γ ⊢ f : Bool -> Bool -> Bool            Γ ⊢ x : Bool                       y: Bool ∈ T
+--------------------------------------------------------- T-App            -------------- T-Var
+                Γ ⊢ f x : Bool -> Bool                                     Γ ⊢ y : Bool
+----------------------------------------------------------------------------------------- T-App
+                                          Γ ⊢ f x y : Bool
+*/
+
+/*
+  3. 
+  x x asks x to simultaneously be a function (to serve as t1) and the argument that function expects (to serve as t2). Since x can only have 
+  one type at a time in any given context, this would force a function’s type to literally equal its own domain type — but a function type 
+  is always “one level deeper” (one more →) than any of its components, so this can never happen. This is exactly the same self-reference
+  obstruction that makes unrestricted self-application (x x, as used to build the Y-combinator or encode non-termination) impossible to 
+  type in the simply typed lambda calculus — it’s precisely this restriction that gives STLC its strong normalization property, unlike 
+  the untyped lambda calculus where x x (and (λx. x x)(λx. x x)) typechecks fine (vacuously, since there’s no type system) and diverges.
+
+  É impossível.
+  Por contradição, Γ ⊢ x x : T é derivável para algum Γ e T.
+
+
+x: T11 -> T12 ∈ T                           x: T11 ∈ T
+---------------------- T-Var          -------------------- T-Var
+Γ ⊢ x : T11 -> T12                        Γ ⊢ x: T11
+----------------------------------------------------------- T-App 
+        Γ ⊢ x x : T (T12)
+
+com isto T11 -> T12 = T11, nunca é satisfazivel. Se T11 é um tipo base (Bool ou Nat) então T11 -> T12 é -> -headed, mas T11 não é.
+Two types with different outermost constructors can never be equal. Contradiction immediately.
+If T11 = S1 → S2 for some S1, S2: then the equation T11 → T12 = T11 becomes (S1 → S2) → T12 = S1 → S2. Since → is an injective constructor 
+(matching domain-to-domain, codomain-to-codomain), this forces S1 → S2 = S1 — the same shape of equation, but now with S1 playing the role 
+T11 played before, and S1 is a proper (strictly smaller) subterm of T11
+Logo, não é possível achar um tipo para xx.
+*/
+
+/*
+  4.
+  Type A — No closed term
+  Regra T-Var não se aplica (x : T ∈ Γ). Contexto vazio, nada para observar
+  T-App mesma coisa, apesar de serem duas sub-derivações.
+  T-Abs pode ser aplicado, o problema é que o resultado sendo sempre T1 -> T2, nunca dá A.
+
+  Type A → A - has closed term
+  aplicamos T-Abs e depois T-Var a 0 ⊢ (lambda x):A.x : A -> A.
+
+      x: A ∈ (x: A)
+---------------------- T-Var
+      x: A ⊢ x: A
+-------------------------------- T-Abs
+  0 ⊢ (lambda x):A.x : A -> A 
+
+  (A → A) → A - No Closed Term
+  No — same obstruction as A, since the only thing in scope (f : A→A) can’t manufacture an A from nothing either
+
+  5.
+  The annotation λx:T1.t isn’t just documentation — it’s what makes T-Abs’s output type a function of the term’s syntax rather than a 
+  free choice. Removing it turns the rule from syntax-directed to non-deterministic (any T1 consistent with the body will do), and as soon 
+  as the body doesn’t actually depend on x’s type (as in λx. true), that freedom becomes literal infinite ambiguity in what type the term 
+  can be assigned — directly contradicting Uniqueness of Types.
+*/
+
+/*
+1. Identifiers required for syntax and judgments
+*/
+
+terminals
+    lambda // terms
+    A // types
+    value // judgment names
+
+
+/*
+2. The syntax for terms, types and contexts
+*/
+
+syntax
+    t ::= x                     // variable
+        | lambda x : T . t[x]   // abstraction
+        | t t                   // application
+
+    T ::= A                     // base type (not in Figure 9-1, see notes)
+        | T -> T                // type of functions
+
+    Gamma ::= *                 // empty context
+            | Gamma, x : T      // term variable binding
+
+
+/*
+3. Judgments
+*/
+
+// Predicate value: a predicate on terms
+judgment value-term: value t
+
+---------------------------- value-abs
+value (lambda x : T . t[x])
+
+
+// Evaluation: a relation on pairs of terms
+judgment step: t -> t
+
+t1 -> t1'
+----------------- E-App1
+t1 t2 -> t1' t2
+
+value t1
+t2 -> t2'
+----------------- E-App2
+t1 t2 -> t1 t2'
+
+value t2
+---------------------------------------- E-AppAbs
+(lambda x : T11 . t12[x]) t2 -> t12[t2]
+
+
+/*
+Typing: a relation on a context, a term and a type
+
+The clause "assumes Gamma" declares Gamma as the context of the judgment:
+the place where the variables that occur free in the term are bound.
+In "Gamma |- t : T", term t may thus mention the variables of Gamma, and
+only those.
+
+The clause has three consequences.
+
+- A rule may extend the context in its premises, as T-Abs does: the
+  premise "Gamma, x : T1 |- t2[x] : T2" binds the variable x that the
+  body t2[x] of the abstraction mentions.
+
+- A rule for variables must take a fixed form (see T-Var below).
+
+- SASyLF provides exchange, weakening and substitution for the judgment
+  (Lemmas 9.3.6 [Permutation], 9.3.7 [Weakening] and 9.3.8 [Preservation
+  of types under substitution], page 106); we need not prove them.
+
+Judgments without the clause, such as "value t" and "t -> t'", relate
+closed terms only: a variable can occur in them only under a lambda.
+
+A theorem that mentions a context other than the empty one, *, must
+repeat the clause (see theorem preservation below).
+*/
+judgment typing: Gamma |- t : T
+assumes Gamma
+
+/*
+The form of T-Var is imposed by SASyLF: the variable is the last one in
+the context. Variables further to the left are reached by weakening and
+exchange.
+*/
+----------------------- T-Var
+Gamma, x : T |- x : T
+
+Gamma, x : T1 |- t2[x] : T2
+------------------------------------------- T-Abs
+Gamma |- lambda x : T1 . t2[x] : T1 -> T2
+
+Gamma |- t1 : T11 -> T12
+Gamma |- t2 : T11
+-------------------------- T-App
+Gamma |- t1 t2 : T12
+
+
+/*
+4. Progress
+
+9.3.5 Theorem [Progress]: Suppose t is a closed, well-typed term (that is,
+|- t : T for some T). Then either t is a value or else there is some t'
+with t -> t'.
+
+There is no case for rule T-Var: its conclusion, Gamma, x : T |- x : T,
+needs a nonempty context, whereas p1 has the empty one, *. SASyLF sees
+this from the form of p1 alone.
+*/
+theorem progress:
+  forall p1: * |- t : T
+  exists value t or t -> t'
+  proof by induction on p1:
+    case rule
+      _: *, x : T1 |- t2[x] : T2
+      ------------------------------------------- T-Abs
+      _: * |- lambda x : T1 . t2[x] : T1 -> T2
+    is
+      _: value (lambda x : T1 . t2[x]) by rule value-abs
+    end case
+    case rule
+      d1: * |- t1 : T11 -> T12
+      d2: * |- t2 : T11
+      -------------------------- T-App
+      _: * |- t1 t2 : T12
+    is
+      ih1: value t1 or t1 -> t1' by induction hypothesis on d1
+      proof by case analysis on ih1:
+        case or v1: value t1 is
+          ih2: value t2 or t2 -> t2' by induction hypothesis on d2
+          proof by case analysis on ih2:
+            case or v2: value t2 is
+              // t1 is a value, hence an abstraction. No need for canonical forms
+              use inversion on v1 where t1 := lambda x : T1 . t11[x]
+              _: (lambda x : T1 . t11[x]) t2 -> t11[t2] by rule E-AppAbs on v2
+            end case
+            case or e2: t2 -> t2' is
+              _: t1 t2 -> t1 t2' by rule E-App2 on v1, e2
+            end case
+          end case analysis
+        end case
+        case or e1: t1 -> t1' is
+          _: t1 t2 -> t1' t2 by rule E-App1 on e1
+        end case
+      end case analysis
+    end case
+  end induction
+end theorem
+
+
+/*
+5. Preservation
+
+9.3.8 Lemma [Preservation of types under substitution]:
+If Gamma, x:S |- t : T and Gamma |- s : S, then Gamma |- [x |-> s]t : T.
+
+This lemma is built in. One can use it, for example, as follows:
+
+  d5: Gamma |- t12[t2] : T by substitution on d4, d2
+or
+  proof by substitution on d4, d2
+
+We state it nevertheless, writing t' and T' for s and S.
+*/
+lemma preservation-under-substitution:
+  assumes Gamma
+  forall p1: Gamma, x : T' |- t[x] : T
+  forall p2: Gamma |- t' : T'
+  exists Gamma |- t[t'] : T
+  proof by substitution on p1, p2
+end lemma
+
+/*
+9.3.9 Theorem [Preservation]:
+If Gamma |- t : T and t -> t', then Gamma |- t' : T.
+
+The proof is by induction on the evaluation derivation. There are three
+cases only, one for each evaluation rule, and no nested case analysis.
+In each case, inversion on p1 yields the typing derivations for the two
+subterms of the application.
+*/
+theorem preservation:
+  assumes Gamma
+  forall p1: Gamma |- t : T
+  forall p2: t -> t'
+  exists Gamma |- t' : T
+  proof by induction on p2:
+    case rule
+      d1: t1 -> t1'
+      ----------------- E-App1
+      _: t1 t2 -> t1' t2
+    is
+      d2: Gamma |- t1 : T11 -> T12 and
+      d3: Gamma |- t2 : T11 by inversion on p1
+      ih: Gamma |- t1' : T11 -> T12 by induction hypothesis on d2, d1
+      proof by rule T-App on ih, d3
+    end case
+    case rule
+      _: value t1
+      d1: t2 -> t2'
+      ----------------- E-App2
+      _: t1 t2 -> t1 t2'
+    is
+      d2: Gamma |- t1 : T11 -> T12 and
+      d3: Gamma |- t2 : T11 by inversion on p1
+      ih: Gamma |- t2' : T11 by induction hypothesis on d3, d1
+      proof by rule T-App on d2, ih
+    end case
+    case rule
+      _: value t2
+      ---------------------------------------- E-AppAbs
+      _: (lambda x : T11 . t12[x]) t2 -> t12[t2]
+    is
+      d2: Gamma |- (lambda x : T11 . t12[x]) : T11 -> T12 and
+      d3: Gamma |- t2 : T11 by inversion on p1
+      d4: Gamma, x : T11 |- t12[x] : T12 by inversion on d2
+      proof by substitution on d4, d3
+    end case
+  end induction
+end theorem
+
+/*
+Exercise: Write an alternative proof of preservation, by induction on the
+typing derivation, as in TAPL.
+*/
+theorem preservation-alternative:
+  assumes Gamma
+  forall p1: Gamma |- t : T
+  forall p2: t -> t'
+  exists Gamma |- t' : T
+  proof by unproved
+end theorem
+
+
+/*
+6. Exercises
+
+The exercises below follow the order of the exercise sheet. Replace each
+"proof by unproved" by a proof; for the exercises without a template, write
+the judgments, lemmas and theorems yourself.
+
+Tips on SASyLF (each cost us some time):
+
+- Variables are written x, x1, x2, x', ..., as declared in the syntax; names
+  such as f, y or t are not variables.
+
+- Arrow types need parentheses, as in A -> (A -> A); so does an abstraction
+  whose body is an application, as in lambda x : A . (x1 x).
+
+- Rule T-Var types the last variable in the context only; the others are
+  reached by weakening, as in
+
+    d0: *, x1 : A |- x1 : A by rule T-Var
+    d1: *, x1 : A, x2 : A |- x1 : A by weakening on d0
+
+- Inversion on a derivation that ends with T-Var fails (SASyLF reports an
+  internal error). Use case analysis instead: it has a single case.
+
+- In a case for T-Var on a derivation of "Gamma |- t : T", the context must
+  be given a new name, as in "Gamma', x : T |- x : T"; otherwise SASyLF
+  reports "may not reuse context name".
+
+- A lemma whose conclusion is contradiction cannot end a proof of another
+  judgment directly. Name its result, then use it:
+
+    c: contradiction by lemma my-lemma on d1, d2
+    proof by contradiction on c
+*/
+
+// No closed value has type A
+lemma no-closed-value-of-type-A:
+  forall v: value t
+  forall d: * |- t : A
+  exists contradiction
+  proof by unproved
+end lemma
+
+// Typing derivations for tru, fls and fst = λp:(A -> (A -> A)) -> A. p tru
+lemma tru-typable:
+  exists * |- lambda x1 : A . lambda x2 : A . x1 : A -> (A -> A)
+  proof by unproved
+end lemma
+
+lemma fls-typable:
+  exists * |- lambda x1 : A . lambda x2 : A . x2 : A -> (A -> A)
+  proof by unproved
+end lemma
+
+lemma fst-typable:
+  exists * |- lambda x : (A -> (A -> A)) -> A . (x (lambda x1 : A . lambda x2 : A . x1)) : ((A -> (A -> A)) -> A) -> A
+  proof by unproved
+end lemma
+
+/*
+Exercises 9.2.2 and 9.2.3, adapted to type A (see the exercise sheet).
+Write x1 for f and x2, x3 for x and y. For 9.2.3, state a lemma with the
+context you found.
+*/
+lemma derivation-1:
+  exists *, x1 : A -> A, x2 : A |- x1 x2 : A
+  proof by unproved
+end lemma
+
+lemma derivation-2:
+  exists *, x1 : A -> A |- lambda x2 : A . (x1 (x1 x2)) : A -> A
+  proof by unproved
+end lemma
+
+// Exercise 9.3.2: x x is not typable
+lemma xx-not-typable:
+  assumes Gamma
+  forall p1: Gamma, x : T' |- x x : T
+  exists contradiction
+  proof by unproved
+end lemma
+
+/*
+Multi-step evaluation preserves types: define the judgment t ->* t' and
+prove the theorem.
+
+The alternative proof of preservation is in section 5 above.
+
+Uniqueness of types: define a judgment for type equality, T = T', and
+prove the theorem.
+
+Determinacy of evaluation: define a judgment for term equality, t = t',
+prove that values do not evaluate, and then prove the theorem.
+*/
