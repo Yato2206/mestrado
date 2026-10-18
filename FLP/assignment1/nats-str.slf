@@ -70,6 +70,17 @@ len e : Nat
 // --------------------------------------- t-Plus
 //        len (Aε) + len (Bε) : Nat 
 
+lemma typable-expression:
+    exists (len (A ε)) plus (len (B ε)): Nat
+    d1: ε : Str by rule T-Empty
+    d2: A ε : Str by rule T-A on d1
+    d3: B ε : Str by rule T-B on d1
+    d4: len (A ε) : Nat by rule T-Len on d2
+    d5: len (B ε) : Nat by rule T-Len on d3
+    d6: (len (A ε)) plus (len (B ε)) : Nat by rule T-Plus on d4, d5
+    proof by d6
+end lemma
+
 // Untypable
 
 // EXPRESSION:
@@ -83,6 +94,13 @@ len e : Nat
 //      len (0 + succ 0) : Nat
 
 // Conclusion: untypable
+
+lemma untypable-expression:
+    forall p1: len (0 plus (succ 0)) : Nat
+    exists contradiction
+    d1: 0 plus (succ 0) : Str by inversion on p1
+    proof by contradiction on d1
+end lemma
 
 // D
 
@@ -263,7 +281,7 @@ e2 -> e2'
 ------------------------------ E-PlusRight
 e1 plus e2 -> e1 plus e2'
 
-nv e1  
+nv succ e1  
 nv e2
 ---------------------------------------- E-PlusSucc
 (succ e1) plus e2 -> succ (e1 plus e2)
@@ -298,7 +316,8 @@ lemma C1:
     exists (succ 0) plus (succ 0) -> succ (0 plus succ (0))
     d1: nv 0 by rule nv-zero
     d2: nv (succ 0) by rule nv-succ on d1
-    proof by rule E-PlusSucc on d1, d2
+    d3: (succ 0) plus (succ 0) -> succ (0 plus succ (0)) by rule E-PlusSucc on d2, d2
+    proof by d3
 end lemma
 
 // 0 + succ 0 -> succ 0 
@@ -307,7 +326,8 @@ lemma C2:
     d1: nv 0 by rule nv-zero
     d2: nv (succ 0) by rule nv-succ on d1
     d3: 0 plus succ 0 -> succ 0 by rule E-PlusZero on d2
-    proof by rule E-Succ on d3
+    d4: succ (0 plus (succ 0)) -> succ (succ 0) by rule E-Succ on d3
+    proof by d4
 end lemma
 
 // e = Bε
@@ -315,7 +335,8 @@ lemma C3:
     exists len (A B ε) -> succ (len (B ε))
     d1: str ε by rule str-empty
     d2: str (B ε) by rule str-B on d1
-    proof by rule E-LenA on d2
+    d3: len (A B ε) -> succ (len (B ε)) by rule E-LenA on d2
+    proof by d3
 end lemma
 
 // e = ε
@@ -323,14 +344,16 @@ lemma C4:
     exists succ (len (B ε)) -> succ (succ (len ε))
     d1: str ε by rule str-empty
     d2: len (B ε) -> succ (len ε) by rule E-LenB on d1
-    proof by rule E-Succ on d2
+    d3: succ (len (B ε)) -> succ (succ (len ε)) by rule E-Succ on d2
+    proof by d3
 end lemma
 
 lemma C5:
     exists (len (A ε)) plus (succ (succ 0)) -> (succ (len ε)) plus (succ (succ 0))
     d1: str ε by rule str-empty
     d2: len (A ε) -> succ (len ε) by rule E-LenA on d1
-    proof by rule E-PlusLeft on d2
+    d3: (len (A ε)) plus (succ (succ 0)) -> (succ (len ε)) plus (succ (succ 0)) by rule E-PlusLeft on d2
+    proof by d3
 end lemma
 
 // D
@@ -422,16 +445,8 @@ end lemma
 lemma succ-empty-str-is-a-normal-form:
     forall p: succ ε -> e'
     exists contradiction
-    proof by case analysis on p:
-        case rule
-            d1: ε -> e1'
-            ------------------ E-Succ
-            _: succ ε -> succ e1'
-        is
-            proof by case analysis on d1:
-            end case analysis
-        end case
-    end case analysis
+    d1: ε -> e1' by inversion on p
+    proof by contradiction on d1
 end lemma
 
 lemma succ-empty-str-is-not-a-value:
@@ -443,24 +458,15 @@ lemma succ-empty-str-is-not-a-value:
             --------- value-nv
             _: value (succ ε)
         is
-            proof by case analysis on d:
-                case rule
-                    d2: nv ε
-                    --------- nv-succ
-                    _: nv (succ ε)
-                is
-                    proof by case analysis on d2:
-                    end case analysis
-                end case
-            end case analysis
+            d2: nv ε by inversion on d
+            proof by contradiction on d2
         end case
         case rule
             d: str (succ ε)
             --------- value-str
             _: value (succ ε)
         is
-            proof by case analysis on d:
-            end case analysis
+            proof by contradiction on d
         end case
     end case analysis
 end lemma
@@ -638,7 +644,8 @@ theorem progress:
                                     --------- nv-succ
                                     _: nv succ e3
                                 is
-                                    _: e -> succ (e3 plus e2) by rule E-PlusSucc on d5, d4
+                                    d6: nv (succ e3) by rule nv-succ on d5
+                                    _: e -> succ (e3 plus e2) by rule E-PlusSucc on d6, d4
                                 end case
                             end case analysis
                         end case
@@ -868,12 +875,12 @@ theorem preservation:
                     proof by rule T-Plus on d1, d6  
                 end case
                 case rule 
-                    d3: nv e3  
+                    d3: nv succ e3  
                     d4: nv e4
                     ---------------------------------------- E-PlusSucc
                     _: (succ e3) plus e4 -> succ (e3 plus e4)
                 is
-                    d5: e3 : Nat by lemma numerical-values-are-nat on d3
+                    d5: e3 : Nat by inversion on d1
                     d6: e4 : Nat by lemma numerical-values-are-nat on d4
                     d7: e3 plus e4: Nat by rule T-Plus on d5, d6
                     proof by rule T-Succ on d7 
