@@ -383,23 +383,39 @@ lemma no-closed-value-of-type-A:
   forall v: value t
   forall d: * |- t : A
   exists contradiction
-  proof by unproved
+  proof by case analysis on v:
+    case rule
+      ---------------------------- value-abs
+      _: value (lambda x : T . t12[x])
+    is
+      proof by contradiction on d
+    end case 
+  end case analysis
 end lemma
 
 // Typing derivations for tru, fls and fst = λp:(A -> (A -> A)) -> A. p tru
 lemma tru-typable:
   exists * |- lambda x1 : A . lambda x2 : A . x1 : A -> (A -> A)
-  proof by unproved
-end lemma
+  d0: *, x1: A |- x1: A by rule T-Var
+  d1: *, x1: A, x2: A |- x1 : A by weakening on d0
+  d2: *, x1: A |- lambda x2 : A . x1 : A -> A by rule T-Abs on d1
+  proof by rule T-Abs on d2
+end lemma               
 
 lemma fls-typable:
   exists * |- lambda x1 : A . lambda x2 : A . x2 : A -> (A -> A)
-  proof by unproved
+  d0: *, x1: A, x2: A |- x2 : A by rule T-Var
+  d1: *, x1: A |- lambda x2 : A . x2 : A -> A by rule T-Abs on d0
+  proof by rule T-Abs on d1
 end lemma
 
 lemma fst-typable:
   exists * |- lambda x : (A -> (A -> A)) -> A . (x (lambda x1 : A . lambda x2 : A . x1)) : ((A -> (A -> A)) -> A) -> A
-  proof by unproved
+  d1: * |- lambda x1 : A . lambda x2 : A . x1 : A -> (A -> A) by lemma tru-typable
+  d2: *, x : (A -> (A -> A)) -> A |- lambda x1 : A . lambda x2 : A . x1 : A -> (A -> A) by weakening on d1
+  d3: *, x : (A -> (A -> A)) -> A |- x : (A -> (A -> A)) -> A by rule T-Var
+  d4: *, x : (A -> (A -> A)) -> A |- (x (lambda x1 : A . lambda x2 : A . x1)) : A by rule T-App on d3, d2
+  proof by rule T-Abs on d4
 end lemma
 
 /*
@@ -436,4 +452,53 @@ prove the theorem.
 
 Determinacy of evaluation: define a judgment for term equality, t = t',
 prove that values do not evaluate, and then prove the theorem.
+*/
+
+// 9
+
+judgment multistep: t ->* t
+
+--------------- Ms-Refl
+t ->* t
+
+t -> t'
+t' ->* t''
+--------------- Ms-Trans
+t ->* t'' 
+
+theorem multistep-preservation:
+  assumes Gamma
+  forall p1: Gamma |- t: T
+  forall p2: t ->* t'
+  exists Gamma |- t': T
+  proof by induction on p2:
+    case rule
+      --------------- Ms-Refl
+      _: t ->* t
+    is
+      proof by p1
+    end case
+    case rule
+      d1: t -> t1
+      d2: t1 ->* t''
+      --------------- Ms-Trans
+      _: t ->* t'' 
+    is
+      d3: Gamma |- t1: T by theorem preservation on p1, d1
+      proof by induction hypothesis on d3, d2
+    end case
+  end induction 
+end theorem
+
+/*
+Why this is induction on p2, not p1
+
+This is worth flagging explicitly, since every other big proof in your file (progress, preservation) was induction on the typing 
+derivation  — but here, it’s the multi-step evaluation derivation that has the natural recursive structure matching the two rules 
+(MS-Refl/MS-Trans), so that’s what you recurse on. The typing derivation p1 is just carried along as a hypothesis, updated one step at a time 
+via the single-step preservation theorem, rather than being the thing you case-split on.
+
+This is also precisely the “Exercise 2.2.8” connection: the shape of this proof (induct on the closure relation; in the recursive case,
+invoke the one-step preserved-property fact, then recurse) is a general pattern for lifting any single-step-preserved property up to its 
+reflexive-transitive closure — here specialized to “being well-typed at type T.
 */
