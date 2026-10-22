@@ -14,6 +14,8 @@ terminals
 syntax  
     e ::= 0 | succ e | e plus e | ε | A e | B e | len e
 
+// 1.A
+
 syntax 
     T ::= Nat | Str
 
@@ -24,6 +26,9 @@ are composed of a declaration stating the name and the form of the judgment
 and zero or more rules.
 */
 // Typing: a relation on a term and a type
+
+// B
+
 judgment typing: e : T
 
 ------------- T-Zero
@@ -434,6 +439,30 @@ lemma str-is-a-normal-form:
             end case analysis
         end case
     end induction
+end lemma
+
+// ADICIONEI DEPOIS
+// SE FOR NECESSARIO PARA A PERGUNTA DO STOR
+lemma value-is-a-normal-form:
+    forall p1: value e
+    forall p2: e -> e'
+    exists contradiction
+    proof by case analysis on p1:
+        case rule
+            d: nv e
+            ------- value-nv
+            _: value e
+        is
+            proof by lemma nv-is-a-normal-form on d, p2
+        end case
+        case rule
+            d: str e
+            ------- value-str
+            _: value e
+        is
+            proof by lemma str-is-a-normal-form on d, p2
+        end case
+    end case analysis
 end lemma
 
 // E
