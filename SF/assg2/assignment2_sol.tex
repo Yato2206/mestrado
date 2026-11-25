@@ -1,0 +1,98 @@
+if x <= y then
+    z := (y - x) / 2 + x;
+else
+    z := (x - y) / 2 + y;
+z := 2 * z ;
+assert z == x + y;
+
+%Calculation of WLP(Trick, true):
+
+x <= y => (2 * ((y-x) / 2 + x) == x + y && true)
+&&
+! (x <= y) => (2 * ((x-y) / 2 + y) == x + y && true)
+    if x <= y then {
+        2 * ((y-x) / 2 + x) == x + y && true
+        z:= (y-x) / 2 + x;
+        2 * z == x+y && true
+        z:= 2 * z;
+        z == x+y && true
+    }
+    else {
+        2 * ((x-y) / 2 + y) == x + y && true 
+        z:= (x-y) / 2 + y;
+        2 * z == x + y && true
+        z:= 2 * z;
+        z == x+y && true
+    }
+    z == x+y && true
+assert (z == x+y);
+    true
+
+WLP (Trick, true) is
+    x <= y => (2 * ((y-x) / 2 + x) == x + y && true)
+                        &&
+! (x <= y) => (2 * ((x-y) / 2 + y) == x + y && true)
+
+2
+(a)
+Para a primeira conjuncao:
+; Variable declarations
+(declare-const x Int)
+(declare-const y Int)
+
+; Constraints
+(assert (<= x y))
+(assert (not
+    (= (* 2 (+ (div (- y x) 2) x))
+       (+ x y))))
+; Solve
+(check-sat)
+(get-model)
+Resposta: SAT, ou seja, achou um contra exemplo, logo não é válido.
+Exemplo: x = 0 e y = 1 -> 2 * ((1-0) / 2+0) != 0 + 1  <=> 2 * (1 / 2 + 0) != 1 <=> 2 * 0 (integer division) != 1
+<=> 0 != 1 (verdadeiro) -> contra exemplo achado
+
+Para a segunda conjunção:
+
+(declare-const x Int)
+(declare-const y Int)
+
+(assert (> x y))
+(assert (not
+    (= (* 2 (+ (div (- x y) 2) y))
+       (+ x y))))
+
+(check-sat)
+Resposta: SAT, ou seja, achou um contra exemplo, logo não é válido.
+Exemplo: x = 1 e y = 0 -> 2 * ((1-0) / 2+0) != 0 + 1 <=> 2 * (1 / 2 + 0) != 1 <=> 2 * 0 (integer division) != 1
+<=> 0 != 1 (verdadeiro) -> contra exemplo achado
+
+RESPOSTA FINAL: Trick não é correto para todos os valores iniciais.
+
+(b)
+(a resposta meio que ja foi dada na alinea anterior. Quando passar para o latex fazer separado).
+O solver retorna 'sat' para as duas queries, tendo achado contra exemplos para ambas as conjunções do WLP.
+Para a primeira conjunção, um contra exemplo é x=0, y=1. O ramo then produz z=0, que é diferente de x+y=1.
+Para a segunda conjunção, um contra exemplo é x=1, y=0. O ramo else produz z=0, que é diferente de x+y=1.
+Para o WLP não ser válido, basta que exista, pelo menos, uma conjunção que não seja válida.
+Assim, nenhuma das conjunções é válida, pelo que o WLP não é válido para todos os initial values das variáveis.
+Podemos concluir que Trick não é correto para todos os integer values de x e y.
+
+Para confirmar, fazendo para a primeira conjunção:
+(declare-const x Int)
+(declare-const y Int)
+
+(assert (<= x y))
+(assert (not
+    (= (* 2 (+ (div (- y x) 2) x))
+       (+ x y))))
+(check-sat)
+(get-model)
+o resultado obtido é:
+sat
+(model 
+  (define-fun y () Int
+    0)
+  (define-fun x () Int
+    (- 1))
+), ou seja, achou como contra-exemplo para a primeira conjunção x=-1 e y=0 -> 2 * ((0-(-1)) / 2 + (-1)) != -1 + 0 <=> -2 != -1, que é verdadeiro.

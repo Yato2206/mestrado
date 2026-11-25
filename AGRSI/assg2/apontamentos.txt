@@ -1,0 +1,143 @@
+tópico escolhido: tópico 3 – Asset valuation and impact estimation. 
+Questão: Por definir
+
+keywords usadas:
+asset valuation
+loss estimation
+incident
+dependencies
+interdependencies
+asset valuation risk assessment
+asset valuation impact estimation
+incident operational disruption costs
+"asset valuation" impact
+"indirect losses" cyber incident
+"cascading effects" infrastructure disruption
+"asset valuation" estimation
+
+asset valuation risk assessment AI
+
+vistas 3 paginas por keyword
+
+QUESTION: “How do AI/ML-based estimation methods handle assets or impacts that are difficult to monetise (due to intangibility, uncertainty,
+or indirect/cascading effects), compared to traditional approaches?”
+
+Research on liquidity and valuation risk assessment of art financial assets based on deep learning:
+https://www.frontiersin.org/journals/artificial-intelligence/articles/10.3389/frai.2026.1946060/full seems ok
+CHOOSE
+
+AI Driven Automated Valuation Models AVMs and Climate Devaluation in Commercial Real Estate CRE Asset Backed Financing
+https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7240658 very promissing
+CHOOSE
+
+AI-driven valuation: a new era for real estate appraisal:
+https://www.emerald.com/jerer/article-abstract/18/1/105/1247048/AI-driven-valuation-a-new-era-for-real-estate?redirectedFrom=fulltext very promissing
+CHOOSE
+
+Artificial Intelligence Driven Lead Time and Cost Forecasting for Global Apparel Merchandising to Reduce Delays Expedite Costs and Total Sourcing Cost:
+https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7040180 seems ok
+
+Reinforcement Learning‐Based Model for Enterprise Financial Asset Risk Assessment and Intelligent Decision‐Making:
+https://www.preprints.org/manuscript/202410.0698 seems good
+CHOOSE
+
+An artificial intelligence-driven holistic multi-criteria framework for data asset valuation:
+https://www.nature.com/articles/s41598-026-59637-x really paired with the question
+CHOOSE
+
+AI and Machine Learning Models in Cross-Asset Class Investment Risk Analysis: A Case Study of Real Estate and Equities Markets:
+https://ieeexplore.ieee.org/document/11081061 i can see something
+MAYBE CHOOSE (OPTIONAL)
+
+The Valuation of Artificial Intelligence:
+https://link.springer.com/chapter/10.1007/978-3-031-53622-9_7 promissing
+CHOOSE
+
+An integrated vision material intelligence framework for infrastructure condition assessment and asset valuation:
+https://www.frontiersin.org/journals/built-environment/articles/10.3389/fbuil.2026.1904075/full i can see some use
+CHOOSE
+
+Enterprise Data Valuation—A Targeted Literature Review:
+https://onlinelibrary.wiley.com/doi/10.1111/joes.12705 this seems usefull
+MAYBE CHOOSE
+
+Cost-of-capital valuation with risky assets:
+https://www.cambridge.org/core/journals/astin-bulletin-journal-of-the-iaa/article/costofcapital-valuation-with-risky-assets/8BF35E5611C527BE420186678870BD4C 
+seems not usefull
+
+ASSET VALUATION DURING CRISES: SPECIFIC CONSIDERATIONS UNDER INFLATION AND UNCERTAINTY:
+https://zenodo.org/records/23179033 seems goood, not very AI related, but i can see this to ve usefull
+MAYBE CHOOSE
+
+Critical Infrastructure failure escalates the macroeconomic impacts of disasters:
+https://www.tandfonline.com/doi/full/10.1080/10286608.2026.2664413 maybe?
+MAYBE CHOOSE (OPTIONAL)
+
+Automated Incident Response and Orchestration:
+https://link.springer.com/chapter/10.1007/978-3-032-17367-6_15 maybe not very good for the tema
+
+Intelligent Incident Prediction in Banking Cloud Operations: A Machine Learning Framework for Proactive SRE Response:
+https://ieeexplore.ieee.org/document/11619889 not related
+
+Is digital transformation a catalyst of knowledge assets for public value creation?:
+https://www.emerald.com/jic/article-abstract/27/4/997/1327673/Is-digital-transformation-a-catalyst-of-knowledge?redirectedFrom=fulltext
+seems not related
+
+AI-Enhanced Remote Sensing of Land Transformations for Climate-Related Financial Risk Assessment in Housing Markets: A Review:
+https://www.mdpi.com/2073-445X/14/8/1672 maybe for the techincal part?
+CHOOSE
+
+http://dx.doi.org/10.62617/se.v2i3.132
+im not being able to open this. cant affear about this one
+
+1 13 18 22 28 29 30 31 32 34 49 50 
+
+28, 29 primeiro
+
+QUESTION: “How do AI/ML-based estimation methods handle assets or impacts that are difficult to monetise (due to intangibility, uncertainty,
+or indirect/cascading effects), compared to traditional approaches?”
+
+Summary in 2–3 sentences
+Summarise only what matters for your review question.
+
+Problem or question
+What problem does this paper address?
+
+Relevant contributions
+What does it contribute to your question?
+
+Approach or method
+Method, model, framework or analysis used.
+
+Key assumptions
+Assumptions that affect interpretation or application.
+
+Evidence type
+Choose a broad evidence category; use Other or mixed when appropriate.
+
+Validation and context
+How evaluated? Dataset, cases, sample, baseline and application context where relevant.
+
+Relevant findings
+Findings relevant to your question; separate proposed capability from demonstrated results.
+
+Strengths and basis
+Identify specific strengths and their evidential basis.
+
+Limitations stated by authors
+Limitations explicitly acknowledged by the authors.
+
+Limitations identified by you
+Your assessment, with reasoning and consequences.
+
+Connections to other papers
+Related P-IDs and how they agree, differ or complement this work.
+
+P50:
+big nonos:
+Limitation (3) is the big one for you. The authors themselves say the analytical condition-assessment step is “not... a validated infrastructure 
+valuation or maintenance decision model” — that’s them confirming, in their own words, exactly the AI-vs-monetisation gap you already identified in 
+“Relevant contributions.” This is a strong, directly citable quote-backed point for your essay.
+Limitation (4)’s data leakage risk (no photograph-level separation guaranteed) is a methodological caveat that could mean even the ~99.9% HEAR-Net 
+numbers are somewhat optimistic — worth noting in your own “Limitations identified by you” cell as something the authors flag but likely underplay
+the severity of.

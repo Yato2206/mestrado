@@ -1,0 +1,65 @@
+===========================================================
+Exercise 1.e
+===========================================================
+Para que a variável \texttt{critical} apresente o valor "CIENCIAS" sem as aspas, é necessário correr o programa com um argumento que sejam 
+composto por 64 caracteres mais "CIENCIAS", por exemplo : 11...11CIENCIAS, sendo 11...11 64 caracteres 1.
+Para chegar a esta solução, primeiro, analisamos os endereços das strings \texttt{str} e \texttt{critical} e verificamos que a difença entre os dois
+endereços são de 64 bytes, sendo que ambas são alocações dinâmicas de memória, pelo que estão localizadas na heap.
+Assim, de modo a que a variável \texttt{critical} apresente o valor "CIENCIAS" sem as aspas, é necessário ir escrevendo na heap desde o endereço da variável 
+\texttt{str} até ao endereço da variável \texttt{critical}.
+Como a diferença de endereços entre as duas variáveis é de 64 bytes, precisamos de escrever 64 bytes na heap desde o endereço de \text{str} até
+o de \texttt{critical} mais o valor "CIENCIAS". Como cada char são 1 byte, escrevemos 64 char de modo a atingirmos este objetivo. 
+
+===========================================================
+Exercise 2.c
+===========================================================
+Para criar um buffer overflow e escrever sobre o registo RBP, são necessários entre 32 bytes e 39 bytes desde o buffer \texttt{buf}, 
+já que desde o endereço de \texttt{buf} até o endereço de RBP são 32 bytes e RBP tem 8 bytes. Isto é provado pela instrução: 
+"leaq -32(%rbp), %rax", que diz que o primeiro endereço do buffer será a menos 32 bytes de RBP.
+Para o registo RIP, já são necessários entre 40 e 47 bytes, já que a lógica é a mesma, sendo a diferença dos endereços de 40 bytes.
+Vale a pena ressaltar que, nesta arquitetura, o endereço de retorno (RIP) fica armazenado na stack imediatamente acima do RBP 
+guardado, a uma distância de 8 bytes
+
+===========================================================
+Exercise 2.d
+===========================================================
+Escrevendo entre 1 e 31 char não acontece nenhum erro. Isto deve-se ao facto de que o conteúdo escrito mais o caracter '\0' não invadem as zonas de
+memória afetas aos registos RBP e RIP. Escrevendo entre 32 e 39 bytes, sem contar com o caracter terminador, o programa resultará em segmentation fault
+com o resultado a aparecer no terminal, já que foi mudado o conteúdo de RBP, mas não o de RIP, fazendo com o programa consiga mostrar a mensagem afeta 
+ao result, tendo em vista que RIP não foi alterado, a chamada à função \texttt{sum_first_n} retornar normalmente.
+Caso se escreva entre os 40 e 47 sem o caracter terminador, no terminal apenas irá resultar em segmentation fault, já que o conteúdo de RIP foi alterado,
+fazendo com que o programa não consiga mostrar a mensagem do result, visto que o programa terá se deslocado para um endereço qualquer, fazendo com
+que o programa não consiga retomar o fio de execução após \texttt{sum_first_n} ter sido executado.
+
+===========================================================
+Exercise 2.h
+===========================================================
+A mensagem "Become SUPERUSER! Was there a BO?" não é mostrada, já que na função main apenas é invocada o endereço em memória onde a função
+\texttt{admin_function} se encontra. A função em si não é chamada, pelo que a mensagem não aparece.
+
+===========================================================
+Exercise 2.j
+===========================================================
+Para que a mensagem apareça, é necessário fazer com em RPI fique o endereço da função \texttt{admin_function}, de modo a que a função a chame.
+Sabemos, pelas alíneas anteriores, que desde o primeiro endereço afeto ao buffer \texttt{buf} até ao primeiro de RPI são 40 bytes. Por isso, A fica com 
+o valor 40 de modo a que a escrita no buffer seja, também, escrita em RPI. Para os outros valores, temos de construir o endereço da função 
+\texttt{admin_function}. No meu caso, a função encontra-se armazenada em 0x5555555551bc.
+Assim, construimos o endereço desde os bits menos significativos até aos mais significativos, ficando com B=0xbc, C=0x51, D=0x55,
+E=0x55, F=0x55, G = 0x55. O endereço a partir daqui já está construído, pelo que H e I ficam com o valor de 0 de modo a não interferirem.
+
+===========================================================
+Exercise 2.k
+===========================================================
+*** stack smashing detected ***: terminated
+Aborted.
+Analisando o assembly gerado pelo compilador, sabemos que foram alocados para o stack 40-16 bytes, ou seja, 24 bytes.
+Ao escrever em buf[40], estamos a passar os limites designados à stack, originando o erro.
+O BO foi detetado pela stack canary mechanism. O overflow corrompeu o valor da canary, causando o runtime check a falhar e o programa a terminar com o
+stack smashing error.
+===========================================================
+Exercise 2.l
+===========================================================
+Neste caso, o canary system foi ativado, mas não detetou o BO, já que a proteção de stack foi ativado.
+Com isto, o endereço on a função \texttt{admin_function} está localizado mudou. Como resultado, ao executar o programa, é introduzido um endereço diferente 
+em RPI, originando o segmentation fault. Caso seja alterado os valores de B, C, D, E, F, G, H, I para o novo valor do endereço, a mensagem apareceria 
+no terminal, sem qualquer erro. 
