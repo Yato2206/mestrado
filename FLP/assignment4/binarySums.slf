@@ -12,6 +12,7 @@ terminals
     zero succ          // 11
     iter               // 12
     plus               // 14
+    one two three      // 15
 
 /*
 2. Syntax
@@ -41,7 +42,7 @@ syntax
     cases :=  lambda X1 . (lambda X2 . (lambda X3 . (lambda x : (X1 mais X2) . (lambda x1 : (X1 -> X3) . (lambda x2 : (X2 -> X3) . 
     (((x {X3}) x1) x2)))))) // 6
 
-    // 10
+// 10
     Nat := fall X . ((X -> X) -> (X -> X)) // Successor -> Zero -> X
 
 // 11
@@ -62,6 +63,12 @@ syntax
 // 14
     // plus := λm : Nat. λn: Nat. iter [Nat] m n succ
     plus := lambda x : Nat . (lambda x1 : Nat . ((((iter {Nat}) x) x1) succ))
+
+// 15
+    // x1 = s, x2 = z
+    one := lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 x2)))
+    two := lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (x1 x2))))
+    three := lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (x1 (x1 x2)))))
 /*
 3. Judgments
 */
@@ -749,7 +756,7 @@ end lemma
     plus := lambda x : Nat . (lambda x1 : Nat . ((((iter {Nat}) x) x1) succ))
     
 ----------------------------------------------------------------------------------- lemma iter-is-typable
-    Gamma, x: Nat, x1: Nat |- iter : fall X1 . (Nat -> (X1 -> ((X1 -> X1) -> X1)))
+    Gamma |- iter : fall X1 . (Nat -> (X1 -> ((X1 -> X1) -> X1)))
 ----------------------------------------------------------------------------------- Weakening      ---------------------------- T-Var
     Gamma, x: Nat, x1: Nat |- iter : fall X1 . (Nat -> (X1 -> ((X1 -> X1) -> X1)))                  Gamma, x: Nat|- x : Nat
 --------------------------------------------------------------------------- T-TApp                  ----------------------------------- Weakening
@@ -763,7 +770,7 @@ end lemma
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
     Gamma, x: Nat |- lambda x1: Nat . (...) : (Nat -> Nat)
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
-    Gamma, |- plus : Nat -> (Nat -> Nat)
+    Gamma |- plus : Nat -> (Nat -> Nat)
 */
 
 lemma plus-is-typable:
@@ -784,3 +791,72 @@ lemma plus-is-typable:
 end lemma 
 
 // 15
+
+// plus 1 2 reduz para um valor
+lemma plus-one-two:
+    exists ((plus one) two) ->* (lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((two {X}) x1) x2)))))
+    d1: value one by rule value-tabs
+    d2: value two by rule value-tabs
+    d3: value succ by rule value-abs
+    d4: (plus one) -> (lambda x1 : Nat . ((((iter {Nat}) one) x1) succ)) by rule E-AppAbs on d1
+    d5: ((plus one) two) -> ((lambda x1 : Nat . ((((iter {Nat}) one) x1) succ)) two) by rule E-App1 on d4
+    d6: ((lambda x1 : Nat . ((((iter {Nat}) one) x1) succ)) two) -> ((((iter {Nat}) one) two) succ) by rule E-AppAbs on d2
+    d7: ((((iter {Nat}) one) two) succ) ->* (((one {Nat}) succ) two) by lemma iter-unfold on Nat, d1, d2, d3
+    d8: (one {Nat}) -> (lambda x1 : (Nat -> Nat) . (lambda x2 : Nat . (x1 x2))) by rule E-TAppTAbs
+    d9: ((one {Nat}) succ) -> ((lambda x1 : (Nat -> Nat) . (lambda x2 : Nat . (x1 x2))) succ) by rule E-App1 on d8
+    d10: (((one {Nat}) succ) two) -> (((lambda x1 : (Nat -> Nat) . (lambda x2 : Nat . (x1 x2))) succ) two) by rule E-App1 on d9
+    d11: ((lambda x1 : (Nat -> Nat) . (lambda x2 : Nat . (x1 x2))) succ) -> (lambda x2 : Nat . (succ x2)) by rule E-AppAbs on d3
+    d12: (((lambda x1 : (Nat -> Nat) . (lambda x2 : Nat . (x1 x2))) succ) two) -> ((lambda x2 : Nat . (succ x2)) two) by rule E-App1 on d11
+    d13: ((lambda x2 : Nat . (succ x2)) two) -> (succ two) by rule E-AppAbs on d2
+    d14: (succ two) -> (lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((two {X}) x1) x2))))) by rule E-AppAbs on d2
+    d15: (lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((two {X}) x1) x2))))) ->* (lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((two {X}) x1) x2))))) by rule Ms-Refl
+    d16: (succ two) ->* (lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((two {X}) x1) x2))))) by rule Ms-Trans on d14, d15
+    d17: ((lambda x2 : Nat . (succ x2)) two) ->* (lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((two {X}) x1) x2))))) by rule Ms-Trans on d13, d16
+    d18: (((lambda x1 : (Nat -> Nat) . (lambda x2 : Nat . (x1 x2))) succ) two) ->* (lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((two {X}) x1) x2))))) by rule Ms-Trans on d12, d17
+    d19: (((one {Nat}) succ) two) ->* (lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((two {X}) x1) x2))))) by rule Ms-Trans on d10, d18
+    d20: ((((iter {Nat}) one) two) succ) ->* (lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((two {X}) x1) x2))))) by lemma multi-trans on d7, d19
+    d21: ((lambda x1 : Nat . ((((iter {Nat}) one) x1) succ)) two) ->* (lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((two {X}) x1) x2))))) by rule Ms-Trans on d6, d20
+    proof by rule Ms-Trans on d5, d21
+end lemma
+
+/*
+    Pelo lema plus-one-two, plus one two reduz para
+        ΛX. λx1 : (X -> X). λx2 : X. x1 (((two [X]) x1) x2).
+    Para chegar a three, este termo teria de ser
+        ΛX. λx1. λx2. x1 (x1 (x1 x2)),
+    mas o redex ((two [X]) x1) x2 está dentro de ΛX. λx1. λx2.
+    A avaliação é call-by-value e não reduz debaixo de lambda,
+    por isso esse redex nunca é reduzido.
+    O lema plus-one-two-is-stuck mostra que
+    o resultado é um valor e já não dá nenhum passo, logo não pode
+    chegar a three.
+*/
+
+// lemma para mostrar que um valor não pode dar um passo de redução
+lemma value-no-step:
+    forall dv: value t
+    forall dt: t -> t'
+    exists contradiction
+    proof by case analysis on dv:
+        case rule
+            --------------------------- value-abs
+            _: value (lambda x : T . t1[x])
+        is
+            proof by contradiction on dt
+        end case
+        case rule
+            ---------------------------- value-tabs
+            _: value (lambda X . t1[X])
+        is
+            proof by contradiction on dt
+        end case
+    end case analysis
+end lemma
+
+// lemma para garantir que o resultado obtido pelo lemma plus-one-two é um valor, e portanto não pode ser reduzido
+lemma plus-one-two-is-stuck:
+    forall dt: (lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((two {X}) x1) x2))))) -> t'
+    exists contradiction
+    d1: value (lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((two {X}) x1) x2))))) by rule value-tabs
+    proof by lemma value-no-step on d1, dt
+end lemma
