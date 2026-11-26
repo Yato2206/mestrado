@@ -1,0 +1,1138 @@
+/*
+    Notas sobre o design:
+
+    - Labels e records. Existem apenas duas labels, foo e bar. Um record (termo ou tipo) é
+      uma lista ordenada: {} é o record vazio e { L = t, r } (tipo: { L : T, R }) acrescenta
+      um campo à frente dos restantes. Como em TAPL, a ordem dos campos faz parte do record:
+      {foo = a, bar = b} e {bar = b, foo = a} são records diferentes, e os tipos também.
+      O tipo {} faz de tipo base.
+
+    - Patterns. Seguem a Figura 11-8: p é uma variável (vp) ou um record pattern rp, com
+      rp ::= {} | { L = p, rp }. Como um binder de SASyLF liga um número fixo de variáveis
+      e um pattern liga um número qualquer, o let não é um binder: "let p = t1 in t2" tem
+      t2 SEM binder, e t2 é uma função curried que recebe os componentes de t1, pela ordem
+      em que as variáveis ocorrem em p. Todos os patterns da Figura 11-8 continuam a poder
+      ser escritos.
+        * match p t : t2 => t3 (M-Var, M-Empty, M-Rcd) aplica t2 aos componentes de t:
+          M-Var dá "t2 t", e M-Rcd só casa um pattern com um record com as mesmas labels,
+          pela mesma ordem.
+        * pattern-typing p : T1 ; T2 => T3 diz que, se p casa com um valor de tipo T1, então
+          uma função t2 de tipo T2 = T_a -> (T_b -> ... -> T3), com um argumento por
+          variável de p, produz um resultado de tipo T3 (PT-Var, PT-Empty, PT-Rcd).
+
+    - Exemplo. let {foo = x, bar = {foo = y, bar = z}} = t1 in t2 escreve-se
+          let {foo = vp, {bar = {foo = vp, {bar = vp, {}}}, {}}} = t1
+          in (lambda x : T1 . lambda y : T2 . lambda z : T3 . t2)
+      isto é, o pattern com vp no lugar de cada variável (os records são escritos na forma
+      { L = p, rp }), seguido de uma função com um lambda por variável, pela ordem do pattern.
+
+    - Labels distintas em record termos. T-Rcd não impõe que as labels de um record termo
+      sejam distintas: a condição só é expressa para tipos (label-fresh, wf). A versão em
+      Haskell rejeita estes termos em typeof (caso Rcd).
+*/
+
+// A
+
+terminals
+    lambda let vp // terms
+    foo bar // labels
+    value match in wf // judgment names
+/*
+2. The syntax for terms, types and contexts
+*/
+
+syntax
+    t ::= x                     // variable
+        | lambda x : T . t[x]   // abstraction
+        | t t                   // application
+        | r                     // record
+        | t . L                 // projection
+        | let p = t in t        // let binding
+
+    r ::= {}                    // empty record
+        | { L = t , r }         // a field and the remaining fields
+
+    L ::= foo | bar             // labels
+
+    p ::= vp                    // variable patern
+        | rp                    // record patern
+
+    rp ::= {}                   // empty context
+        | { L = p, rp }         // a field and the remaining fields
+
+    S, T, U ::= T -> T             // type of functions
+        | R                     // record type
+
+    R ::= {}                    // empty record type
+        | {L : T, R}            // a field and the remaining fields
+
+    Gamma ::= *                 // empty context
+       | Gamma, x : T           // term variable binding
+
+/*
+3. Judgments
+*/
+
+judgment value-term: value t
+
+---------------------------- value-abs
+value (lambda x : T . t[x])
+
+---------------------------- value-rcd-empty
+value {}
+
+value t
+value r
+---------------------------- value-rcd-cons
+value {L = t, r}
+
+judgment label-neq: L <> L
+
+--------- neq-foo-bar
+foo <> bar
+
+--------- neq-bar-foo
+bar <> foo
+
+judgment term-equality: T = T
+
+------ type-eq
+T = T
+
+// Field lookup in a record type: the first field with label L
+judgment type-lookup: L : T in T
+
+------------------------ LT-Here
+L : T1 in {L : T1, R}
+
+L <> L'
+L : T in R
+------------------------- LT-Skip
+L : T in {L' : T1, R}
+
+//
+judgment record-lookup: L = t in r
+
+------------------------------ RL-Here
+L = t in { L = t , r }
+
+L <> L'
+L = t in r
+------------------------------ RL-Skip
+L = t in { L' = t' , r }
+
+// matching: match p t : t => t
+judgment matching: match p t : t => t
+
+------------------------- M-Var
+match vp t: t1 => t1 t
+
+------------------------- M-Empty
+match {} {}: t1 => t1 
+
+match p t: t1 => t2
+match rp r: t2 => t3 
+----------------------------------------------- M-Rcd
+match { L = p, rp } { L = t, r }: t1 => t3
+
+// Pattern typing: p: T; T => T
+judgment pattern-typing: p: T; T => T
+
+---------------------------------- PT-Var
+vp: T1; (T1 -> T2) => T2
+
+---------------------------------- PT-Empty
+{}: {}; T1 => T1
+
+p: T1; T2 => T3
+rp: R; T3 => T4
+---------------------------------- PT-Rcd
+{ L = p, rp }: { L : T1, R }; T2 => T4
+
+// Evaluation: a relation on pairs of terms
+judgment step: t -> t
+
+t1 -> t1'
+----------------- E-App1
+t1 t2 -> t1' t2
+
+value t1
+t2 -> t2'
+----------------- E-App2
+t1 t2 -> t1 t2'
+
+value t2
+---------------------------------------- E-AppAbs
+(lambda x : T11 . t12[x]) t2 -> t12[t2]
+
+t -> t'
+---------------------------------- E-Rcd1
+{L = t, r} -> {L = t', r}
+
+value t
+r -> r'
+---------------------------------- E-Rcd2
+{L = t, r} -> {L = t, r'}
+
+t -> t'
+---------------------------------- E-Proj
+t . L -> t' . L
+
+value r
+L = t in r
+---------------------------------- E-ProjRcd
+r . L -> t
+
+t1 -> t1'
+---------------------------------- E-Let
+let p = t1 in t2 -> let p = t1' in t2
+
+value t1
+match p t1 : t2 => t3
+---------------------------------------- E-LetV
+let p = t1 in t2 -> t3
+
+// B
+
+judgment typing: Gamma |- t : T
+assumes Gamma
+
+Gamma, x : T1 |- t2[x] : T2
+------------------------------------------- T-Abs
+Gamma |- lambda x : T1 . t2[x] : T1 -> T2
+
+Gamma |- t1 : T11 -> T12
+Gamma |- t2 : T11
+-------------------------- T-App
+Gamma |- t1 t2 : T12
+
+----------------------- T-Var
+Gamma, x : T |- x : T
+
+------------------- T-RcdEmpty
+Gamma |- {} : {}
+
+Gamma |- t1 : T1
+Gamma |- r : R
+--------------------------------------- T-Rcd
+Gamma |- {L = t1, r} : {L : T1, R}
+
+Gamma |- t : T
+L : T' in T
+---------------------- T-Proj
+Gamma |- t . L : T'
+
+Gamma |- t1: T1
+p: T1; T2 => T3
+Gamma |- t2: T2
+---------------------------------- T-LetP
+Gamma |- let p = t1 in t2: T3 
+
+// C
+
+/*
+    Type: ThreeSeq = {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}
+
+    mk : {} → {} → {} → ThreeSeq 
+
+    mk = λa:{} . λb:{} . λc: {} . {foo = a, bar = {foo = b, bar = c}}
+
+                                                    ---------------------------- T-Var       --------------------------------------- T-Var ------------------------------------- T-RcdEmpty
+                                                    a: {}, b: {}, Gamma |- b: {}               a: {}, b: {}, c: {}, Gamma |- c: {}         a: {}, b: {}, c: {}, Gamma |- {}: {}   
+                                                    ----------------------------------- Weak  ------------------------------------------------------------- T-Rcd
+                                                    a: {}, b: {}, c: {}, Gamma |- b: {}         a: {}, b: {}, c: {}, Gamma |- {bar = c, {}}: {bar: {}, {}}
+    ---------------------------------- T-Var        --------------------------------------------------------------------------------------------------------------- T-Rcd         -------------------------------------- T-RcdEmpty
+    a: {}, Gamma |- a: {}                           a: {}, b: {}, c: {}, Gamma |- {foo = b, {bar = c, {}}}: {foo: {}, {bar: {}, {}}}                                                 a: {}, b: {}, c: {}, Gamma |- {} : {}               
+---------------------------------------- weakening   ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Rcd
+    a: {}, b: {}, c: {}, Gamma |- a: {}             a: {}, b: {}, c: {}, Gamma |-  {bar = {foo = b, {bar = c, {}}}, {}}: {bar: {foo: {}, {bar: {}, {}}}, {}}
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Rcd
+                                        a: {}, b: {}, c: {}, Gamma |- {foo = a, {bar = {foo = b, {bar = c, {}}}, {}}}: {foo: {}, {bar: {foo: {}, {bar: {}, {}}}, {}}} = ThreeSeq
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+                                                    a: {}, b: {} |- λc: {} . {foo = a, {bar = {foo = b, {bar = c, {}}}, {}}}: {} -> ThreeSeq 
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+                                                        a: {} |- λb:{} . λc: {} . {foo = a, {bar = {foo = b, {bar = c, {}}}, {}}}: {} -> {} -> ThreeSeq 
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+                                                        |- λa:{} . λb:{} . λc: {} . {foo = a, {bar = {foo = b, {bar = c, {}}}, {}}}: {} -> {} -> {} -> ThreeSeq 
+*/
+
+// x1 = a, x2 = b, x3 = c
+lemma mk-is-typable: 
+    exists * |- (lambda x1 : {} . (lambda x2 : {} . (lambda x3 : {} .
+    {foo = x1, {bar = {foo = x2 , {bar = x3, {}}}, {}}}))) : {} -> ({} -> ({} -> {foo: {} , {bar: {foo: {} , {bar: {}, {}}}, {}}}))
+
+    // Começando pelo mais acima à direita: {bar = x3, {}} : {bar : {}, {}}
+    d1: *, x1: {}, x2: {}, x3: {} |- {} : {} by rule T-RcdEmpty
+    d2: *, x1: {}, x2: {}, x3: {} |- x3 : {} by rule T-Var
+    d3: *, x1: {}, x2: {}, x3: {} |- {bar = x3, {}}: {bar: {}, {}} by rule T-Rcd on d2, d1
+
+    // {foo = x2, {bar = x3, {}}} : {foo : {}, {bar : {}, {}}}
+    d4: *, x1: {}, x2: {} |- x2: {} by rule T-Var  
+    d5: *, x1: {}, x2: {}, x3: {} |- x2: {} by weakening on d4 
+    d6: *, x1: {}, x2: {}, x3: {} |- {foo = x2, {bar = x3, {}}}: {foo: {}, {bar: {}, {}}} by rule T-Rcd on d5, d3    
+
+    // {} : {} (lado do x3 sozinho)
+    d7: *, x1:{}, x2:{}, x3:{} |- {} : {} by rule T-RcdEmpty
+
+    // {bar = {foo=x2,{bar=x3,{}}}, {}} : {bar : {foo:{},{bar:{},{}}}, {}}
+    d8: *, x1:{}, x2:{}, x3:{} |- {bar = {foo = x2, {bar = x3, {}}}, {}}: {bar: {foo: {}, {bar: {}, {}}}, {}} by rule T-Rcd on d6, d7
+
+    // {foo = x1, {bar = ..., {}}} : ThreeSeq
+    d9: *, x1:{} |- x1 : {} by rule T-Var
+    d10: *, x1:{}, x2:{}, x3:{} |- x1: {} by weakening on d9
+    d11: *, x1:{}, x2:{}, x3:{} |- {foo = x1, {bar = {foo = x2, {bar = x3, {}}}, {}}}: {foo: {}, {bar: {foo: {}, {bar: {}, {}}}, {}}} by rule T-Rcd on d10, d8
+
+    //sequência de 3 T-Abs
+    d12: *, x1:{}, x2:{} |- (lambda x3 : {} . {foo = x1, {bar = {foo = x2, {bar = x3, {}}}, {}}}) : {} -> {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} by rule T-Abs on d11
+    d13: *, x1:{} |- (lambda x2 : {} . (lambda x3 : {} . {foo = x1, {bar = {foo = x2, {bar = x3, {}}}, {}}})) : {} -> ({} -> {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}) 
+by rule T-Abs on d12
+    proof by rule T-Abs on d13
+end lemma
+
+// D
+
+/*
+    ThreeSeq = {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}
+    
+    SixSeq = {foo: ThreeSeq, bar: ThreeSeq}
+    SixSeq = {foo: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, bar: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}}
+*/
+
+// E
+/*
+    append = lambda x1 : ThreeSeq . lambda x2: ThreeSeq .
+        let PAT = x1 in
+        (lambda x3 : {} . lambda x4 : {} . lambda x5 : {} .
+            let PAT = x2 in
+            (lambda x6 : {} . lambda x7 : {} . lambda x8 : {} .
+            {foo = {foo = x3, {bar = {foo = x4, {bar = x5, {}}}, {}}},
+                {bar = {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}}, {}}}))
+
+Legenda:
+E = {}
+TB = {foo : E, {bar : E, {}}}
+TS = {foo : E, {bar : TB, {}}} (ThreeSeq)
+SS = {foo : TS, {bar : TS, {}}} (Six)
+G2 = *, x1: TS, x2: TS
+T2 = E -> (E -> (E -> SS))
+G5 = *, x1: TS, x2: TS, x3: E, x4: E, x5: E
+G8 = *, x1: TS, x2: TS, x3: E, x4: E, x5: E, x6: E, x7: E, x8: E
+S1 = {foo = x3, {bar = {foo = x4, {bar = x5, {}}}, {}}}
+S2 = {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}}
+
+
+                                                                                                *1 Pattern tree
+Legenda:                                                            
+P2 = {foo = vp, {bar = vp, {}}}                                                   
+                                                                                ------------------------ PT-Var  -------------------- PT-Empty
+                                                                                   vp: E; E -> SS => SS            {}: {}; SS => SS
+                                        -------------------------------- PT-Var   -------------------------------------------- PT-Rcd 
+                                        vp: E; E -> (E -> SS) => E -> SS          {bar : vp, {}} = {bar : E, {}}; E -> SS => SS      
+                                        ------------------------------------------------------------------------------------------------------ PT-Rcd    ----------------- PT-Empty
+                                        P2: TB; E -> (E -> SS) => SS                                                                                       {}: {}; SS => SS    
+--------------------------- PT-Var      ---------------------------------------------------------------------------------------------------------------------------------------------- PT-Rcd
+vp: E; T2 => E -> (E -> SS)             {bar : P2, {}} = {bar : TB, {}}; E -> (E -> SS) => SS             
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- PT-Rcd
+PAT : TS ; T2 => SS 
+
+
+                                                                                                                            -------------- T-Var                                                                                                                             -------------- T-Var
+                                                                                                                            *, x5: E |- x5: E                                                                                                                                   *, x8 |- x8: E 
+                                                                                                ----------------- T-Var     ------------ weakening  ------------- T-RcdEmpty                                                                    ----------------- T-Var     ------------ weakening  ------------- T-RcdEmpty
+                                                                                                *, x4: E |- x4: E           G8 |- x5 : E            G8 |- {}: {}                                                                                *, x7: E |- x7: E           G8 |- x8 : E            G8 |- {}: {} 
+                                                                                                   ----------- weakening     ------------------------------------ T-Rcd                                             ---------------- T-Var       ----------- weakening     ------------------------------------ T-Rcd 
+                                                                                                   G8 |- x4: E              G8 |- {bar = x5, {}}: {bar : E, {}}                                                    *, x6: E|- x6: E              G8 |- x7: E              G8 |- {bar = x8, {}}: {bar : E, {}}        
+                                                                        ------------------- T-Var  ----------------------------------------------------------------------- T-Rcd   --------------T-RcdEmpty         -------------- weakening    -------------------------------------------------------------- T-Rcd                                                        
+                                                                        *, x3: E|- x3: E            G8 |- {foo = x4, {bar = x5, {}}} : TB                                           G8 |- {}: {}                       G8 |- x6: E              G8 |- {bar = {foo = x7, {bar = x8, {}}}, {}} : {bar : TB, {}}
+                                                                        ------------- weakening     ---------------------------------------------------------------------------------------------------------- T-Rcd    ------------------------------------------------------------------------------------------------- T-Rcd        ------------------ T-RcdEmpty                                                                                        
+                                                                        G8 |- x3: E                 G8 |- {bar = {foo = x4, {bar = x5, {}}}, {}} : {bar : TB, {}}                                                       G8 |- S2: TS                                                                                                      G8 |- {}: {}                    
+                                                                    -------------------------------------------------------- T-Rcd                                                                                     -------------------------------------------------------------------------------------------------------------------------------------------------- T-Rcd
+                                                                                                          G8 |- S1: TS                                                                                                  G8 |- {bar = S2, {}} : {bar : TS, {}}                                                                         
+                                                                                                         ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ T-Rcd
+                                                                                                            G8 |- {foo = S1, {bar = S2, {}}} : {foo : TS, {bar : TS, {}}} 
+                                                    ----------------------- T-Var                          ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs (lambda x8)
+                                                        *, x2: TS |- x2: TS                                ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs (lambda x7)
+                                                        ----------------- weakening     (same tree *1)      ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs (lambda x6)
+                                                            G5 |- x2: TS                PAT: TS; T2 => SS   G5 |- lambda x6: {} . lambda x7:{} . lambda x8: {} (...): T2  
+                                                            -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-LetP
+                                                                            G5 |- let PAT = x2 in (...): SS
+------------------- T-Var                                      --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs (lambda x5)
+*, x1: TS |- x1: TS                                            --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs (lambda x4)
+---------------------- Weakening      (tree done in *1)        --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs (lambda x3)
+G2 |- x1: TS                         PAT: TS; T2 => SS          G2 |- lambda x3: {}. lambda x4: {}. lambda x5: {}. let (...): T2
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-LetP
+*, x1: TS, x2: TS |- let PAT = x1 in (...): SS
+----------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+*, x1: TS |- lambda x2: TS (...): TS -> SS
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+    * |- append : ThreeSeq (TS) -> ThreeSeq (TS) -> SixSeq (SS)
+*/
+
+lemma append-is-typable:
+    exists * |- (lambda x1 : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} . (lambda x2 : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} . (let {foo = vp, {bar = {foo = vp, {bar = vp, {}}}, {}}} = x1 in (lambda x3 : {} . (lambda x4 : {} . (lambda x5 : {} . (let {foo = vp, {bar = {foo = vp, {bar = vp, {}}}, {}}} = x2 in (lambda x6 : {} . (lambda x7 : {} . (lambda x8 : {} . {foo = {foo = x3, {bar = {foo = x4, {bar = x5, {}}}, {}}}, {bar = {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}}, {}}})))))))))) : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} -> ({foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}})
+
+    // Pattern tree
+    // {} : {} ; SS => SS
+    p1: {} : {} ; {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} => {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} by rule PT-Empty
+    // vp : E ; E -> SS => SS
+    p2: vp : {} ; ({} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}}) => {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} by rule PT-Var
+    // {bar = vp, {}} : {bar : E, {}} ; E -> SS => SS
+    p3: {bar = vp, {}} : {bar : {}, {}} ; ({} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}}) => {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} by rule PT-Rcd on p2, p1
+    // vp : E ; E -> (E -> SS) => E -> SS
+    p4: vp : {} ; ({} -> ({} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}})) => ({} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}}) by rule PT-Var
+    // P2 : TB ; E -> (E -> SS) => SS
+    p5: {foo = vp, {bar = vp, {}}} : {foo : {}, {bar : {}, {}}} ; ({} -> ({} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}})) => {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} by rule PT-Rcd on p4, p3
+    // {} : {} ; SS => SS
+    p6: {} : {} ; {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} => {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} by rule PT-Empty
+    // {bar = P2, {}} : {bar : TB, {}} ; E -> (E -> SS) => SS
+    p7: {bar = {foo = vp, {bar = vp, {}}}, {}} : {bar : {foo : {}, {bar : {}, {}}}, {}} ; ({} -> ({} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}})) => {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} by rule PT-Rcd on p5, p6
+    // vp : E ; T2 => E -> (E -> SS)
+    p8: vp : {} ; ({} -> ({} -> ({} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}}))) => ({} -> ({} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}})) by rule PT-Var
+    // PAT : TS ; T2 => SS 
+    p9: {foo = vp, {bar = {foo = vp, {bar = vp, {}}}, {}}} : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} ; ({} -> ({} -> ({} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}}))) => {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} by rule PT-Rcd on p8, p7
+
+    // {} : {}
+    d10: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- {} : {} by rule T-RcdEmpty
+    // x8 : E
+    d11: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- x8 : {} by rule T-Var
+    // {bar = x8, {}} : {bar : E, {}}
+    d12: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- {bar = x8, {}} : {bar : {}, {}} by rule T-Rcd on d11, d10
+    // x7 : E
+    d13: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {} |- x7 : {} by rule T-Var
+    d14: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- x7 : {} by weakening on d13
+    // {foo = x7, {bar = x8, {}}} : TB
+    d15: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- {foo = x7, {bar = x8, {}}} : {foo : {}, {bar : {}, {}}} by rule T-Rcd on d14, d12
+    // {bar = {foo = x7, {bar = x8, {}}}, {}} : {bar : TB, {}}
+    d16: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- {bar = {foo = x7, {bar = x8, {}}}, {}} : {bar : {foo : {}, {bar : {}, {}}}, {}} by rule T-Rcd on d15, d10
+    // x6 : E
+    d17: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {} |- x6 : {} by rule T-Var
+    d18: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- x6 : {} by weakening on d17
+    // S2 : TS
+    d19: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}} : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} by rule T-Rcd on d18, d16
+    // {bar = S2, {}} : {bar : TS, {}}
+    d20: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- {bar = {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}}, {}} : {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}} by rule T-Rcd on d19, d10
+    // x5 : E
+    d21: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {} |- x5 : {} by rule T-Var
+    d22: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- x5 : {} by weakening on d21
+    // {bar = x5, {}} : {bar : E, {}}
+    d23: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- {bar = x5, {}} : {bar : {}, {}} by rule T-Rcd on d22, d10
+    // x4 : E
+    d24: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {} |- x4 : {} by rule T-Var
+    d25: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- x4 : {} by weakening on d24
+    // {foo = x4, {bar = x5, {}}} : TB
+    d26: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- {foo = x4, {bar = x5, {}}} : {foo : {}, {bar : {}, {}}} by rule T-Rcd on d25, d23
+    // {bar = {foo = x4, {bar = x5, {}}}, {}} : {bar : TB, {}}
+    d27: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- {bar = {foo = x4, {bar = x5, {}}}, {}} : {bar : {foo : {}, {bar : {}, {}}}, {}} by rule T-Rcd on d26, d10
+    // x3 : E
+    d28: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {} |- x3 : {} by rule T-Var
+    d29: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- x3 : {} by weakening on d28
+    // S1 : TS
+    d30: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- {foo = x3, {bar = {foo = x4, {bar = x5, {}}}, {}}} : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} by rule T-Rcd on d29, d27
+    // {foo = S1, {bar = S2, {}}} : SS
+    d31: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {}, x8: {} |- {foo = {foo = x3, {bar = {foo = x4, {bar = x5, {}}}, {}}}, {bar = {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}}, {}}} : {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} by rule T-Rcd on d30, d20
+
+    // lambda x8, x7, x6
+    d32: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {}, x7: {} |- (lambda x8 : {} . {foo = {foo = x3, {bar = {foo = x4, {bar = x5, {}}}, {}}}, {bar = {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}}, {}}}) : {} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} by rule T-Abs on d31
+    d33: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {}, x6: {} |- (lambda x7 : {} . (lambda x8 : {} . {foo = {foo = x3, {bar = {foo = x4, {bar = x5, {}}}, {}}}, {bar = {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}}, {}}})) : {} -> ({} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}}) by rule T-Abs on d32
+    d34: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {} |- (lambda x6 : {} . (lambda x7 : {} . (lambda x8 : {} . {foo = {foo = x3, {bar = {foo = x4, {bar = x5, {}}}, {}}}, {bar = {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}}, {}}}))) : {} -> ({} -> ({} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}})) by rule T-Abs on d33
+    // x2 : TS
+    d35: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} |- x2 : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} by rule T-Var
+    d36: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {} |- x2 : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} by weakening on d35
+    // let de dentro
+    d37: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {}, x5: {} |- (let {foo = vp, {bar = {foo = vp, {bar = vp, {}}}, {}}} = x2 in (lambda x6 : {} . (lambda x7 : {} . (lambda x8 : {} . {foo = {foo = x3, {bar = {foo = x4, {bar = x5, {}}}, {}}}, {bar = {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}}, {}}})))) : {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} by rule T-LetP on d36, p9, d34
+
+    // lambda x5, x4, x3
+    d38: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {}, x4: {} |- (lambda x5 : {} . (let {foo = vp, {bar = {foo = vp, {bar = vp, {}}}, {}}} = x2 in (lambda x6 : {} . (lambda x7 : {} . (lambda x8 : {} . {foo = {foo = x3, {bar = {foo = x4, {bar = x5, {}}}, {}}}, {bar = {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}}, {}}}))))) : {} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} by rule T-Abs on d37
+    d39: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x3: {} |- (lambda x4 : {} . (lambda x5 : {} . (let {foo = vp, {bar = {foo = vp, {bar = vp, {}}}, {}}} = x2 in (lambda x6 : {} . (lambda x7 : {} . (lambda x8 : {} . {foo = {foo = x3, {bar = {foo = x4, {bar = x5, {}}}, {}}}, {bar = {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}}, {}}})))))) : {} -> ({} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}}) by rule T-Abs on d38
+    d40: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} |- (lambda x3 : {} . (lambda x4 : {} . (lambda x5 : {} . (let {foo = vp, {bar = {foo = vp, {bar = vp, {}}}, {}}} = x2 in (lambda x6 : {} . (lambda x7 : {} . (lambda x8 : {} . {foo = {foo = x3, {bar = {foo = x4, {bar = x5, {}}}, {}}}, {bar = {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}}, {}}}))))))) : ({} -> ({} -> ({} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}}))) by rule T-Abs on d39
+    // x1 : TS
+    d41: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} |- x1 : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} by rule T-Var
+    d42: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} |- x1 : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} by weakening on d41
+    // let de fora
+    d43: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, x2: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} |- (let {foo = vp, {bar = {foo = vp, {bar = vp, {}}}, {}}} = x1 in (lambda x3 : {} . (lambda x4 : {} . (lambda x5 : {} . (let {foo = vp, {bar = {foo = vp, {bar = vp, {}}}, {}}} = x2 in (lambda x6 : {} . (lambda x7 : {} . (lambda x8 : {} . {foo = {foo = x3, {bar = {foo = x4, {bar = x5, {}}}, {}}}, {bar = {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}}, {}}})))))))) : {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} by rule T-LetP on d42, p9, d40
+
+    // lambda x2, x1
+    d44: *, x1: {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} |- (lambda x2 : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} . (let {foo = vp, {bar = {foo = vp, {bar = vp, {}}}, {}}} = x1 in (lambda x3 : {} . (lambda x4 : {} . (lambda x5 : {} . (let {foo = vp, {bar = {foo = vp, {bar = vp, {}}}, {}}} = x2 in (lambda x6 : {} . (lambda x7 : {} . (lambda x8 : {} . {foo = {foo = x3, {bar = {foo = x4, {bar = x5, {}}}, {}}}, {bar = {foo = x6, {bar = {foo = x7, {bar = x8, {}}}, {}}}, {}}}))))))))) : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}} -> {foo : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {bar : {foo : {}, {bar : {foo : {}, {bar : {}, {}}}, {}}}, {}}} by rule T-Abs on d43
+    proof by rule T-Abs on d44
+end lemma
+
+// F
+
+// confirmar que para todo record r, se existe um lookup correspondente
+lemma record-lookup-exist:
+    forall d: * |- r : R
+    forall l: L : T in R
+    exists L = t0 in r.
+    proof by induction on l:
+        case rule
+            ------------------------------ LT-Here
+            _: L : T1 in { L : T1 , R1 }
+        is
+            proof by case analysis on d:
+                case rule
+                    d1: * |- t1 : T1
+                    d2: * |- r1 : R1
+                    ------------------------------------------ T-Rcd
+                    _: * |- { L = t1 , r1 } : { L : T1 , R1 }
+                is
+                    _: L = t1 in { L = t1 , r1 } by rule RL-Here
+                end case
+            end case analysis
+        end case
+        case rule
+            n: L <> L'
+            l1: L : T in R1
+            ------------------------------ LT-Skip
+            _: L : T in { L' : T1 , R1 }
+        is
+            proof by case analysis on d:
+                case rule
+                    d1: * |- t1 : T1
+                    d2: * |- r1 : R1
+                    ------------------------------------------------ T-Rcd
+                    _: * |- { L' = t1 , r1 } : { L' : T1 , R1 }
+                is
+                    ih: L = t0 in r1 by induction hypothesis on d2, l1
+                    _: L = t0 in { L' = t1 , r1 } by rule RL-Skip on n, ih
+                end case
+            end case analysis
+        end case
+    end induction
+end lemma
+
+// confirmar que para todo match m, se existe um typing correspondente
+lemma match-types:
+    assumes Gamma
+    forall pt: p : T1 ; T2 => T3
+    forall m: match p t : t2 => t3
+    forall d: Gamma |- t : T1
+    forall d2: Gamma |- t2 : T2
+    exists Gamma |- t3 : T3.
+    proof by induction on m:
+        case rule
+            ------------------------------ M-Var
+            _: match vp t : t2 => t2 t
+        is
+            proof by case analysis on pt:
+                case rule
+                    ------------------------------ PT-Var
+                    _: vp : T1 ; (T1 -> T5) => T5
+                is
+                    proof by rule T-App on d2, d
+                end case
+            end case analysis
+        end case
+        case rule
+            ------------------------------ M-Empty
+            _: match {} {} : t2 => t2
+        is
+            proof by case analysis on pt:
+                case rule
+                    ------------------------------ PT-Empty
+                    _: {} : {} ; T2 => T2
+                is
+                    proof by d2
+                end case
+            end case analysis
+        end case
+        case rule
+            m1: match p5 t5 : t2 => t6
+            m2: match rp5 r5 : t6 => t7
+            ------------------------------------------------------ M-Rcd
+            _: match { L5 = p5 , rp5 } { L5 = t5 , r5 } : t2 => t7
+        is
+            proof by case analysis on pt:
+                case rule
+                    pt1: p5 : T7 ; T2 => T5
+                    pt2: rp5 : R5 ; T5 => T6
+                    ------------------------------------------------ PT-Rcd
+                    _: { L5 = p5 , rp5 } : { L5 : T7 , R5 } ; T2 => T6
+                is
+                    proof by case analysis on d:
+                        case rule
+                            d5: Gamma |- t5 : T7
+                            d6: Gamma |- r5 : R5
+                            ------------------------------------------------ T-Rcd
+                            _: Gamma |- { L5 = t5 , r5 } : { L5 : T7 , R5 }
+                        is
+                            d7: Gamma |- t6 : T5 by induction hypothesis on pt1, m1, d5, d2
+                            proof by induction hypothesis on pt2, m2, d6, d7
+                        end case
+                    end case analysis
+                end case
+            end case analysis
+        end case
+    end induction
+end lemma
+
+
+// confirmar que para todo pattern p, se existe um match correspondente
+lemma match-exist:
+    forall pt: p : T1 ; T2 => T3
+    forall d: * |- t : T1
+    forall v: value t
+    forall d2: * |- t2 : T2
+    exists match p t : t2 => t3.
+    proof by induction on pt:
+        case rule
+            ------------------------------ PT-Var
+            _: vp : T1 ; (T1 -> T5) => T5
+        is
+            proof by rule M-Var
+        end case
+        case rule
+            ------------------------------ PT-Empty
+            _: {} : {} ; T2 => T2
+        is
+            proof by case analysis on v:
+                case rule
+                    ------------------------------------ value-abs
+                    _: value (lambda x : T0 . t5[x])
+                is
+                    proof by contradiction on d
+                end case
+                case rule
+                    ---------------------------- value-rcd-empty
+                    _: value {}
+                is
+                    proof by rule M-Empty
+                end case
+                case rule
+                    v5: value t5
+                    v6: value r5
+                    ---------------------------- value-rcd-cons
+                    _: value { L5 = t5 , r5 }
+                is
+                    proof by contradiction on d
+                end case
+            end case analysis
+        end case
+        case rule
+            pt1: p5 : T7 ; T2 => T5
+            pt2: rp5 : R5 ; T5 => T6
+            ------------------------------------------------ PT-Rcd
+            _: { L5 = p5 , rp5 } : { L5 : T7 , R5 } ; T2 => T6
+        is
+            proof by case analysis on v:
+                case rule
+                    ------------------------------------ value-abs
+                    _: value (lambda x : T0 . t5[x])
+                is
+                    proof by contradiction on d
+                end case
+                case rule
+                    ---------------------------- value-rcd-empty
+                    _: value {}
+                is
+                    proof by contradiction on d
+                end case
+                case rule
+                    v5: value t5
+                    v6: value r5
+                    ---------------------------- value-rcd-cons
+                    _: value { L8 = t5 , r5 }
+                is
+                    proof by case analysis on d:
+                        case rule
+                            d5: * |- t5 : T7
+                            d6: * |- r5 : R5
+                            ------------------------------------------------ T-Rcd
+                            _: * |- { L8 = t5 , r5 } : { L8 : T7 , R5 }
+                        is
+                            m1: match p5 t5 : t2 => t6 by induction hypothesis on pt1, d5, v5, d2
+                            d7: * |- t6 : T5 by lemma match-types on pt1, m1, d5, d2
+                            m2: match rp5 r5 : t6 => t7 by induction hypothesis on pt2, d6, v6, d7
+                            proof by rule M-Rcd on m1, m2
+                        end case
+                    end case analysis
+                end case
+            end case analysis
+        end case
+    end induction
+end lemma
+
+// necessário por causa do R ser restrito. Muda o tipo R para S
+lemma proj-value:
+    forall p1: value t
+    forall p2: * |- t : S
+    forall p3: L : T in S
+    exists t . L -> t'.
+    proof by case analysis on p2:
+        case rule
+            _: *, x : T1 |- t2[x] : T2
+            ------------------------------------------- T-Abs
+            _: * |- lambda x : T1 . t2[x] : T1 -> T2
+        is
+            proof by contradiction on p3
+        end case
+        case rule
+            _: * |- t1 : T11 -> T12
+            _: * |- t2 : T11
+            -------------------------- T-App
+            _: * |- t1 t2 : T12
+        is
+            proof by contradiction on p1
+        end case
+        case rule
+            ------------------- T-RcdEmpty
+            _: * |- {} : {}
+        is
+            proof by contradiction on p3
+        end case
+        case rule
+            _: * |- t1 : T1
+            _: * |- r1 : R1
+            --------------------------------------- T-Rcd
+            d1: * |- {L1 = t1, r1} : {L1 : T1, R1}
+        is
+            e: L = t0 in {L1 = t1, r1} by lemma record-lookup-exist on d1, p3
+            proof by rule E-ProjRcd on p1, e
+        end case
+        case rule
+            _: * |- t1 : S1
+            _: L1 : T1 in S1
+            ------------------------ T-Proj
+            _: * |- t1 . L1 : T1
+        is
+            proof by contradiction on p1
+        end case
+        case rule
+            _: * |- t1 : T1
+            _: p : T1 ; T2 => T3
+            _: * |- t2 : T2
+            ---------------------------------- T-LetP
+            _: * |- let p = t1 in t2 : T3
+        is
+            proof by contradiction on p1
+        end case
+    end case analysis
+end lemma
+
+theorem progress:
+    forall d: * |- t : T
+    exists value t or t -> t'
+    proof by induction on d:
+    // Case T-Abs
+        case rule
+            _: *, x : T1 |- t2[x] : T2
+            ------------------------------------------- T-Abs
+            _: * |- lambda x : T1 . t2[x] : T1 -> T2
+        is
+            _: value (lambda x : T1 . t2[x]) by rule value-abs
+        end case
+    // Case T-App
+        case rule
+            d1: * |- t1 : T11 -> T12
+            d2: * |- t2 : T11
+            -------------------------- T-App
+            _: * |- t1 t2 : T12
+        is
+            ih1: value t1 or t1 -> t1' by induction hypothesis on d1
+            proof by case analysis on ih1:
+                case or v1: value t1 is
+                    ih2: value t2 or t2 -> t2' by induction hypothesis on d2
+                    proof by case analysis on ih2:
+                        case or v2: value t2 is
+                            proof by case analysis on v1:
+                                case rule 
+                                    ---------------------------- value-abs
+                                    _: value (lambda x : T1 . t11[x]) 
+                                is
+                                    _: (lambda x : T1 . t11[x]) t2 -> t11 [t2]  by rule E-AppAbs on v2
+                                end case
+                                case rule
+                                    ---------------------------- value-rcd-empty
+                                    _: value {}
+                                is
+                                    proof by contradiction on d1
+                                end case
+                                case rule
+                                    v3: value t3
+                                    v4: value r1
+                                    ---------------------------- value-rcd-cons
+                                    _: value {L1 = t3, r1}
+                                is
+                                    proof by contradiction on d1
+                                end case 
+                            end case analysis
+                        end case
+                        case or e2: t2 -> t2' is
+                            _: t1 t2 -> t1 t2' by rule E-App2 on v1, e2
+                        end case
+                    end case analysis
+                end case
+                case or e1: t1 -> t1' is
+                    _: t1 t2 -> t1' t2 by rule E-App1 on e1
+                end case
+            end case analysis
+        end case
+    // Case T-RcdEmpty
+        case rule
+            ------------------- T-RcdEmpty
+            _: * |- {} : {}
+        is
+            _: value {} by rule value-rcd-empty
+        end case
+    // Case T-Rcd
+        case rule
+            d1: * |- t1 : T1
+            d2: * |- r : R
+            --------------------------------------- T-Rcd
+            _: * |- {L = t1, r} : {L : T1, R}
+        is 
+            ih1: value t1 or t1 -> t1' by induction hypothesis on d1
+            proof by case analysis on ih1:
+                case or v1: value t1 is 
+                    ih2: value r or r -> t4 by induction hypothesis on d2
+                    proof by case analysis on ih2:
+                        case or v2: value r is
+                            _: value { L = t1 , r } by rule value-rcd-cons on v1, v2
+                        end case
+                        case or e2: r -> t4 is
+                            proof by case analysis on e2:   
+                                case rule 
+                                    d5: t5 -> t5'
+                                    ---------------------------------- E-Rcd1
+                                    _: {L5 = t5, r5} -> {L5 = t5', r5}
+                                is
+                                    _: {L = t1, {L5 = t5, r5}} -> {L = t1, {L5 = t5', r5}} by rule E-Rcd2 on v1, e2
+                                end case
+                                case rule
+                                    d5: value t5
+                                    d6: r6 -> r6'
+                                    ---------------------------------- E-Rcd2
+                                    _: {L6 = t5, r6} -> {L6 = t5, r6'}
+                                is
+                                    _: {L = t1, {L6 = t5, r6}} -> {L = t1, {L6 = t5, r6'}} by rule E-Rcd2 on v1, e2
+                                end case
+                            end case analysis       
+                        end case
+                    end case analysis
+                end case
+                case or e1: t1 -> t1' is
+                    _: {L = t1, r} -> {L = t1', r} by rule E-Rcd1 on e1
+                end case
+            end case analysis
+        end case
+    // Case T-Proj
+        case rule
+            d1: * |- t1 : S
+            d2: L : T in S
+            ------------------------ T-Proj
+            _: * |- t1 . L : T
+        is
+            ih1: value t1 or t1 -> t1' by induction hypothesis on d1
+            proof by case analysis on ih1:
+                case or v1: value t1 is
+                    _: t1 . L -> t0 by lemma proj-value on v1, d1, d2
+                end case
+                case or s1: t1 -> t1' is
+                    _: t1 . L -> t1' . L by rule E-Proj on s1
+                end case
+            end case analysis
+        end case
+    // Case T-LetP
+        case rule
+            d1: * |- t1: T1
+            d2: p: T1; T2 => T3
+            d3: * |- t2: T2
+            ---------------------------------- T-LetP
+            _: * |- let p = t1 in t2: T3
+        is
+            ih1: value t1 or t1 -> t1' by induction hypothesis on d1
+            proof by case analysis on ih1:
+                case or v1: value t1 is
+                    m: match p t1 : t2 => t3 by lemma match-exist on d2, d1, v1, d3
+                    _: let p = t1 in t2 -> t3 by rule E-LetV on v1, m
+                end case
+                case or s1: t1 -> t1' is
+                    _: let p = t1 in t2 -> let p = t1' in t2 by rule E-Let on s1
+                end case
+            end case analysis
+        end case
+    end induction
+end theorem
+
+// se um campo de um record bem tipado (encontrado via lookup em nível de termo) corresponde a um label também encontrado via lookup em 
+// nível de tipo no tipo do record, esse campo tem exatamente o tipo encontrado.
+lemma lookup-preserves-type:
+    assumes Gamma
+    forall p1: Gamma |- r: R
+    forall p2: L = t in r
+    forall p3: L: T in R
+    exists Gamma |- t: T
+    proof by induction on p1:
+        case rule
+            ------------------- T-RcdEmpty
+            _: Gamma |- {} : {}
+        is
+            proof by contradiction on p2
+        end case
+        case rule
+            d1: Gamma |- t1 : T1
+            d2: Gamma |- r1 : R1
+            --------------------------------------- T-Rcd
+            _: Gamma |- {L1 = t1, r1} : {L1 : T1, R1}
+        is
+            proof by case analysis on p2:
+                case rule
+                ------------------------------ RL-Here
+                    _: L1 = t1 in {L1 = t1, r1}
+                is
+                    proof by case analysis on p3: 
+                        case rule 
+                            ------------------------ LT-Here
+                            _: L1 : T1 in {L1 : T1, R1}
+                        is 
+                            proof by d1
+                        end case
+                        case rule
+                            d4: L1 <> L1
+                            d5: L1 : T in R1
+                            ------------------------- LT-Skip
+                            _: L1 : T in {L1 : T1, R1}
+                        is
+                            proof by contradiction on d4
+                        end case
+                    end case analysis
+                end case
+                case rule
+                    d4: L2 <> L2'
+                    d5: L2 = t in r1
+                    ------------------------------ RL-Skip
+                    _: L2 = t in {L2' = t1', r1}
+                is
+                    proof by case analysis on p3: 
+                        case rule 
+                            ------------------------ LT-Here
+                            _: L1 : T1 in {L1 : T1, R1}
+                        is 
+                            proof by contradiction on d4
+                        end case
+                        case rule
+                            d6: L2 <> L2'
+                            d7: L2 : T in R1
+                            ------------------------- LT-Skip
+                            _: L2 : T in {L2' : T1, R1}
+                        is
+                            ih: Gamma |- t: T by induction hypothesis on d2, d5, d7
+                            proof by ih
+                        end case
+                    end case analysis
+                end case
+            end case analysis
+        end case
+    end induction
+end lemma
+
+theorem preservation:
+    assumes Gamma
+    forall p1: Gamma |- t : T
+    forall p2: t -> t'
+    exists Gamma |- t' : T
+    proof by induction on p1:
+    // Case T-Abs
+        case rule
+            d1: Gamma, x : T1 |- t2[x] : T2
+            ------------------------------------------- T-Abs
+            _: Gamma |- lambda x : T1 . t2[x] : T1 -> T2
+        is
+            proof by contradiction on p2
+        end case
+    // Case T-App
+        case rule
+            d1: Gamma |- t1 : T11 -> T12
+            d2: Gamma |- t2 : T11
+            -------------------------- T-App
+            _: Gamma |- t1 t2 : T12
+        is
+            proof by case analysis on p2:
+                case rule
+                    d3: t1 -> t1'
+                    ----------------- E-App1
+                    _: t1 t2 -> t1' t2
+                is
+                    ih: Gamma |- t1' : T11 -> T12 by induction hypothesis on d1, d3
+                    proof by rule T-App on ih, d2
+                end case
+                case rule
+                    _: value t1
+                    d3: t2 -> t2'
+                    ----------------- E-App2
+                    _: t1 t2 -> t1 t2'
+                is
+                    ih: Gamma |- t2' : T11 by induction hypothesis on d2, d3
+                    proof by rule T-App on d1, ih
+                end case
+                case rule
+                    _: value t2
+                    ---------------------------------------- E-AppAbs
+                    _: (lambda x : T13 . t12[x]) t2 -> t12[t2]
+                is
+                    d4: Gamma, x : T13 |- t12[x] : T12 by inversion on d1
+                    proof by substitution on d4, d2
+                end case
+            end case analysis
+        end case
+    // Case T-RcdEmpty
+        case rule
+            ------------------- T-RcdEmpty
+            _: Gamma |- {} : {}
+        is
+            proof by contradiction on p2
+        end case
+    // Case T-Rcd
+        case rule
+            d1: Gamma |- t1 : T1
+            d2: Gamma |- r : R
+            --------------------------------------- T-Rcd
+            _: Gamma |- {L = t1, r} : {L : T1, R}
+        is
+            proof by case analysis on p2:
+                case rule
+                    d4: t1 -> t1'
+                    ---------------------------------- E-Rcd1
+                    _: {L = t1, r} -> {L = t1', r}
+                is
+                    ih: Gamma |- t1' : T1 by induction hypothesis on d1, d4
+                    proof by rule T-Rcd on ih, d2
+                end case
+                case rule
+                    _: value t1
+                    d4: r -> r'
+                    ---------------------------------- E-Rcd2
+                    _: {L = t1, r} -> {L = t1, r'}
+                is
+                    ih: Gamma |- r' : R by induction hypothesis on d2, d4
+                    proof by rule T-Rcd on d1, ih
+                end case
+            end case analysis
+        end case
+    // Case T-Proj
+        case rule
+            d1: Gamma |- t1 : S
+            d2: L : T in S
+            ---------------------- T-Proj
+            _: Gamma |- t1 . L : T
+        is
+            proof by case analysis on p2:
+                case rule
+                    d3: t1 -> t1'
+                    ---------------------------------- E-Proj
+                    _: t1 . L -> t1' . L
+                is
+                    ih: Gamma |- t1' : S by induction hypothesis on d1, d3
+                    proof by rule T-Proj on ih, d2
+                end case
+                case rule
+                    _: value r
+                    d3: L = t2 in r
+                    ---------------------------------- E-ProjRcd
+                    _: r . L -> t2
+                is
+                    d4: Gamma |- r : R and
+                    d5: L : T in R by inversion on p1
+                    proof by lemma lookup-preserves-type on d4, d3, d5
+                end case
+            end case analysis
+        end case
+    // Case T-LetP
+        case rule
+            d1: Gamma |- t1: T1
+            d2: p: T1; T2 => T3
+            d3: Gamma |- t2: T2
+            ---------------------------------- T-LetP
+            _: Gamma |- let p = t1 in t2: T3
+        is
+            proof by case analysis on p2:
+                case rule
+                    d4: t1 -> t1'
+                    ---------------------------------- E-Let
+                    _: let p = t1 in t2 -> let p = t1' in t2
+                is
+                    ih: Gamma |- t1' : T1 by induction hypothesis on d1, d4
+                    proof by rule T-LetP on ih, d2, d3
+                end case
+                case rule
+                    _: value t1
+                    d4: match p t1 : t2 => t3
+                    ---------------------------------------- E-LetV
+                    _: let p = t1 in t2 -> t3
+                is
+                    proof by lemma match-types on d2, d4, d1, d3
+                end case
+            end case analysis
+        end case
+    end induction
+end theorem
+
+// G
+
+// garantir que não há duplicatas de labels em um record type
+judgment label-fresh: L # R
+
+--------- LF-Empty
+L # {}
+
+L <> L'
+L # R
+--------- LF-Cons
+L # {L' : T, R}
+
+judgment well-formed: wf T
+
+---------- wf-empty
+wf {}
+
+wf T1
+wf R
+L # R
+---------------- wf-cons
+wf {L : T1, R}
+
+wf T1
+wf T2
+------------------ wf-arrow
+wf (T1 -> T2)
+
+// 1. Derivável com uma label repetida não é well-formed.
+// |- λx:{foo:{},{foo:{},{}}}. x : {foo:{},{foo:{},{}}} → {foo:{},{foo:{},{}}}
+/*
+--------------------------------------------------------- T-Var
+    x : {foo:{},{foo:{},{}}} |- x : {foo:{},{foo:{},{}}} 
+----------------------------------------------------------------------------- T-Abs
+   λx:{foo:{},{foo:{},{}}}. x : {foo:{},{foo:{},{}}} → {foo:{},{foo:{},{}}} 
+*/
+
+// provar que existe um tipo {foo:{},{foo:{},{}}} derivável e não é well-formed
+lemma derivable-not-wf:
+    exists * |- lambda x : {foo : {}, {foo : {}, {}}} . x : {foo : {}, {foo : {}, {}}} -> {foo : {}, {foo : {}, {}}}
+    d1: *, x : {foo : {}, {foo : {}, {}}} |- x : {foo : {}, {foo : {}, {}}} by rule T-Var
+    proof by rule T-Abs on d1
+end lemma
+
+// 2. esse tipo não é well-formed: wf-cons exigiria foo # {foo : {}, {}}, e LF-Cons
+// exigiria foo <> foo, o que é impossível. Com 1., o tipo é derivável mas não well-formed.
+lemma dup-not-wf:
+    forall w: wf {foo : {}, {foo : {}, {}}}
+    exists foo <> bar
+    proof by case analysis on w:
+        case rule
+            _: wf {}
+            _: wf {foo : {}, {}}
+            f: foo # {foo : {}, {}}
+            ---------------------------------------- wf-cons
+            _: wf {foo : {}, {foo : {}, {}}}
+        is
+            proof by case analysis on f:
+                case rule
+                    n: foo <> foo
+                    _: foo # {}
+                    ------------------------------ LF-Cons
+                    _: foo # {foo : {}, {}}
+                is
+                    proof by contradiction on n
+                end case
+            end case analysis
+        end case
+    end case analysis
+end lemma

@@ -1,0 +1,786 @@
+// 1
+
+terminals
+    lambda Lambda fall // terms and types
+    value wf           // judgment forms
+    // abbreviations
+    mais               // 3 
+    inl                // 4
+    inr                // 5
+    cases              // 6
+    Nat                // 10
+    zero succ          // 11
+    iter               // 12
+    plus               // 14
+
+/*
+2. Syntax
+*/
+
+syntax
+    t ::= x                         // variable
+        | lambda x : T . t[x]       // abstraction
+        | t t                       // application
+        | lambda X . t[X]           // type abstraction
+        | t { T }                   // type application
+
+    T ::= X                         // type variable
+        | T -> T                    // type of functions
+        | fall X . T[X]             // universal type
+
+    Gamma ::= *                     // empty context
+       | Gamma, x : T               // term variable binding
+       | Gamma, X                   // type variable binding
+
+    (T1 mais T2) := fall X . ((T1 -> X) -> ((T2 -> X) -> X))  // 3
+    
+    inl := lambda X1 . (lambda X2 . (lambda x : X1 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)))))) // 4
+
+    inr := lambda X1 . (lambda X2 . (lambda x : X2 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x2 x)))))) // 5
+
+    cases :=  lambda X1 . (lambda X2 . (lambda X3 . (lambda x : (X1 mais X2) . (lambda x1 : (X1 -> X3) . (lambda x2 : (X2 -> X3) . 
+    (((x {X3}) x1) x2)))))) // 6
+
+    // 10
+    Nat := fall X . ((X -> X) -> (X -> X)) // Successor -> Zero -> X
+
+// 11
+    // λX. λs: X->X. λz: X . z
+    // x1 = s, x2 = z
+    zero := lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . x2)) // 11
+
+    // λn:CNat. λX. λs: X->X. λz:X . s (n [X] s z)
+    // x = n, x1 = s, x2 = z
+    succ := lambda x : Nat . (lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((x {X}) x1) x2)))))
+
+// 12
+    // iter = Λc. λn: Nat. λz: c. λs: c → c. n [c] s z
+    // ΛX. λn: Nat. λz: X. λs: X->X . n [X] s z
+    // X1 = c, x = n, x1 = base case, x2 = step
+    iter := lambda X1 . (lambda x : Nat . (lambda x1 : X1 . (lambda x2 : (X1 -> X1) . (((x {X1}) x2) x1))))
+
+// 14
+    // plus := λm : Nat. λn: Nat. iter [Nat] m n succ
+    plus := lambda x : Nat . (lambda x1 : Nat . ((((iter {Nat}) x) x1) succ))
+/*
+3. Judgments
+*/
+
+judgment value-term: value t
+
+---------------------------- value-abs
+value (lambda x : T . t[x])
+
+---------------------------- value-tabs
+value (lambda X . t[X])
+
+// Evaluation: a relation on pairs of terms
+judgment step: t -> t
+
+t1 -> t1'
+----------------- E-App1
+t1 t2 -> t1' t2
+
+value t1
+t2 -> t2'
+----------------- E-App2
+t1 t2 -> t1 t2'
+
+value t2
+---------------------------------------- E-AppAbs
+(lambda x : T11 . t12[x]) t2 -> t12[t2]
+
+t1 -> t1'
+----------------- E-TApp
+t1 {T2} -> t1' {T2}
+
+------------------------------------- E-TAppTAbs
+(lambda X . t12[X]) {T2} -> t12[T2]
+
+judgment typing: Gamma |- t : T
+assumes Gamma
+
+Gamma, x : T1 |- t2[x] : T2
+------------------------------------------- T-Abs
+Gamma |- lambda x : T1 . t2[x] : T1 -> T2
+
+Gamma |- t1 : T11 -> T12
+Gamma |- t2 : T11
+-------------------------- T-App
+Gamma |- t1 t2 : T12
+
+----------------------- T-Var
+Gamma, x : T |- x : T
+
+Gamma, X |- t2[X] : T2[X]
+------------------------------------------- T-TAbs
+Gamma |- lambda X . t2[X] : fall X . T2[X]
+
+Gamma |- t1 : fall X . T12[X]
+------------------------------------------- T-TApp
+Gamma |- t1 {T2} : T12[T2]
+/*
+Gamma |- t0: Nat
+Gamma |- t1: T
+Gamma, x: T |- t2[x]: T
+------------------------------------------- T-Iter
+Gamma |- (iter T t1 x . t2[x] t0) : T 
+*/
+// 2
+
+judgment type-wf: Gamma |- T wf
+assumes Gamma 
+
+----------------- wf-var
+Gamma, X |- X wf
+
+Gamma |- T1 wf
+Gamma |- T2 wf
+------------------------ wf-arrow
+Gamma |- T1 -> T2 wf
+
+Gamma, X |- T1[X] wf
+------------------------ wf-fall
+Gamma |- fall X . T1[X] wf
+
+// 7
+
+/*
+     inl := lambda X1 . (lambda X2 . (lambda x : X1 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)))))) 
+    
+    --------------------------------------------------------------------------- T-Var              ----------------------------------- T-Var
+    Gamma, X1, X2, x : X1, X, x1 : (X1 -> X) |- x1 : (X1 -> X)                                       Gamma, X1, X2, x : X1 |- x : X1
+    ----------------------------------------------------------------------------- Weakening       -------------------------------------------------------------------------- Weakening
+    Gamma, X1, X2, x : X1, X, x1 : (X1 -> X) |- x1 : (X1 -> X) |- x : (X1 -> X)                       Gamma, X1, X2, x : X1, X, x1 : (X1 -> X), x2 : (X2 -> X) |- x : X1
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-App
+    Gamma, X1, X2, x : X1, X, x1 : (X1 -> X), x2 : (X2 -> X) |- (x1 x) : X
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+    Gamma, X1, X2, x : X1, X, x1 : (X1 -> X) |- (lambda x2 : (X2 -> X) . (x1 x) : ((X2 -> X) -> X))
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+    Gamma, X1, X2, x : X1, X |- (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)) : ((X1 -> X) -> ((X2 -> X) -> X))
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-TAbs
+    Gamma, X1, X2, x : X1 |- (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x1 x))) : fall X . ((X1 -> X) -> ((X2 -> X) -> X))
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+    Gamma, X1, X2 |- (lambda x : X1 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)))) : (X1 -> (fall X . ((X1 -> X) -> ((X2 -> X) -> X)))) 
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-TAbs
+    Gamma, X1 |- (lambda X2 . (lambda x : X1 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x1 x))))) : fall X2 . (X1 -> (fall X . ((X1 -> X) -> ((X2 -> X) -> X))))
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-TAbs
+    Gamma |- lambda X1 . (lambda X2 . (lambda x : X1 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)))))) 
+*/
+
+lemma inl-is-typable:
+    exists * |- inl : fall X1 . (fall X2 . (X1 -> (X1 mais X2)))
+    d1: *, X1, X2, x : X1, X, x1 : (X1 -> X) |- x1 : (X1 -> X) by rule T-Var
+    d2: *, X1, X2, x : X1, X, x1 : (X1 -> X), x2 : (X2 -> X) |- x1 : (X1 -> X) by weakening on d1
+    d3: *, X1, X2, x : X1 |- x : X1 by rule T-Var
+    d4: *, X1, X2, x : X1, X, x1 : (X1 -> X), x2 : (X2 -> X) |- x : X1 by weakening on d3
+    d5: *, X1, X2, x : X1, X, x1 : (X1 -> X), x2 : (X2 -> X) |- x1 x : X by rule T-App on d2, d4
+    d6: *, X1, X2, x : X1, X, x1 : (X1 -> X) |- lambda x2 : (X2 -> X) . (x1 x) : ((X2 -> X) -> X) by rule T-Abs on d5
+    d7: *, X1, X2, x : X1, X |- lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)) : ((X1 -> X) -> ((X2 -> X) -> X)) by rule T-Abs on d6
+    d8: *, X1, X2, x : X1 |- lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x1 x))) : fall X . ((X1 -> X) -> ((X2 -> X) -> X)) by rule T-TAbs on d7
+    d9: *, X1, X2 |- lambda x : X1 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)))) : (X1 -> (fall X . ((X1 -> X) -> ((X2 -> X) -> X)))) by rule T-Abs on d8
+    d10: *, X1 |- lambda X2 . (lambda x : X1 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x1 x))))) : fall X2 . (X1 -> (fall X . ((X1 -> X) -> ((X2 -> X) -> X)))) by rule T-TAbs on d9
+    proof by rule T-TAbs on d10
+end lemma
+
+/*
+
+inr := lambda X1 . (lambda X2 . (lambda x : X2 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x2 x))))))
+    
+                                                                                                     ----------------------------------- T-Var
+                                                                                                       Gamma, X1, X2, x : X1 |- x : X2
+    ----------------------------------------------------------------------------- T-Var               -------------------------------------------------------------------------- Weakening
+    Gamma, X1, X2, x : X1, X, x1 : (X1 -> X) |- x2 : (X2 -> X) |- x2 : (X2 -> X)                       Gamma, X1, X2, x : X1, X, x1 : (X1 -> X), x2 : (X2 -> X) |- x : X2
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-App
+    Gamma, X1, X2, x : X1, X, x1 : (X1 -> X), x2 : (X2 -> X) |- (x2 x) : X
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+    Gamma, X1, X2, x : X1, X, x1 : (X1 -> X) |- (lambda x2 : (X2 -> X) . (x2 x) : ((X2 -> X) -> X))
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+    Gamma, X1, X2, x : X1, X |- (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x2 x)) : ((X1 -> X) -> ((X2 -> X) -> X))
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-TAbs
+    Gamma, X1, X2, x : X2 |- (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x2 x))) : fall X . ((X1 -> X) -> ((X2 -> X) -> X))
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+    Gamma, X1, X2 |- (lambda x : X2 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x2 x)))) : (X2 -> (fall X . ((X1 -> X) -> ((X2 -> X) -> X)))) 
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-TAbs
+    Gamma, X1 |- (lambda X2 . (lambda x : X2 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x2 x))))) : fall X2 . (X2 -> (fall X . ((X1 -> X) -> ((X2 -> X) -> X))))
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-TAbs
+    Gamma |- lambda X1 . (lambda X2 . (lambda x : X2 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x2 x))))))
+
+*/
+
+lemma inr-is-typable:
+    exists * |- inr : fall X1 . (fall X2 . (X2 -> (X1 mais X2)))
+    d1: *, X1, X2, x : X2, X, x1 : (X1 -> X), x2 : (X2 -> X) |- x2 : (X2 -> X) by rule T-Var
+    d2: *, X1, X2, x : X2 |- x : X2 by rule T-Var
+    d3: *, X1, X2, x : X2, X, x1 : (X1 -> X), x2 : (X2 -> X) |- x : X2 by weakening on d2
+    d4: *, X1, X2, x : X2, X, x1 : (X1 -> X), x2 : (X2 -> X) |- x2 x : X by rule T-App on d1, d3
+    d5: *, X1, X2, x : X2, X, x1 : (X1 -> X) |- lambda x2 : (X2 -> X) . (x2 x) : ((X2 -> X) -> X) by rule T-Abs on d4
+    d6: *, X1, X2, x : X2, X |- lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x2 x)) : ((X1 -> X) -> ((X2 -> X) -> X)) by rule T-Abs on d5
+    d7: *, X1, X2, x : X2 |- lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x2 x))) : fall X . ((X1 -> X) -> ((X2 -> X) -> X))
+by rule T-TAbs on d6
+    d8: *, X1, X2 |- lambda x : X2 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x2 x))))
+: (X2 -> (fall X . ((X1 -> X) -> ((X2 -> X) -> X)))) by rule T-Abs on d7
+    d9: *, X1 |- lambda X2 . (lambda x : X2 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x2 x))))) 
+: fall X2 . (X2 -> (fall X . ((X1 -> X) -> ((X2 -> X) -> X)))) by rule T-TAbs on d8
+    proof by rule T-TAbs on d9
+end lemma
+
+/*
+    cases :=  lambda X1 . (lambda X2 . (lambda X3 . (lambda x : (X1 mais X2) . (lambda x1 : (X1 -> X3) . (lambda x2 : (X2 -> X3) . 
+        (((x {X3}) x1) x2))))))
+
+------------------------------------------------------------------------------------------------------------------------ T-Var
+    Gamma, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))) |- x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X)))
+----------------------------------------------------------------- Weakening                                                          ---------------------------------------------------------------------------------------------------- T-Var
+    Gamma, (...) |- x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))                                                                       Gamma, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))), x1 : (X1 -> X3) |- x1 : (X1 -> X3)
+--------------------------------------------------------------- T-App                                                                       ------------------------------------------------------------------------------------------------------ Weakening
+    Gamma, (...) |- x {X3} : ((X1 -> X3) -> ((X2 -> X3) -> X3))                                                                                  Gamma, (...) |- x1 : (X1 -> X3)
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-App
+    Gamma, X1, X2, X3, x : (...), x1 : (...), x2 : (...) |- (((x {X3}) x1) x2) : X3
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs        
+    Gamma, X1, X2, X3, x : (...), x1 : (...) |- lambda x2 (...) : ((X2 -> X3) -> X3))
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+    Gamma, X1, X2, X3, x: ((fall X . ((X1 -> X) -> ((X2 -> X) -> X))) |- lambda x1 (...) : ((X1 -> X3) -> ((X2 -> X3) -> X3))
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+    Gamma, X1, X2, X3 |- lambda x (...) : ((fall X . ((X1 -> X) -> ((X2 -> X) -> X))) -> ((X1 -> X3) -> ((X2 -> X3) -> X3)))
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-TAbs
+    Gamma, X1, X2 |- lambda X3 (...) : fall X3 . (((fall X . ((X1 -> X) -> ((X2 -> X) -> X))) -> ((X1 -> X3) -> ((X2 -> X3) -> X3))))
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-TAbs
+    Gamma, X1 |- lambda X2 (...) : fall X2 . (fall X3 . (((fall X . ((X1 -> X) -> ((X2 -> X) -> X))) -> ((X1 -> X3) -> ((X2 -> X3) -> X3))))) 
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-TAbs
+                                                                                        Gamma |- cases
+
+*/
+
+lemma cases-typable:
+    exists * |- cases : fall X1 . (fall X2 . (fall X3 . ((X1 mais X2) -> ((X1 -> X3) -> ((X2 -> X3) -> X3)))))
+    d1: *, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))) |- x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))) by rule T-Var
+    d2: *, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))), x1 : (X1 -> X3), x2 : (X2 -> X3) |- x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))) by weakening on d1
+    d3: *, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))), x1 : (X1 -> X3), x2 : (X2 -> X3) |- x {X3} : ((X1 -> X3) -> ((X2 -> X3) -> X3)) by rule T-TApp on d2
+    d4: *, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))), x1 : (X1 -> X3) |- x1 : (X1 -> X3) by rule T-Var
+    d5: *, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))), x1 : (X1 -> X3), x2 : (X2 -> X3) |- x1 : (X1 -> X3) by weakening on d4
+    d6: *, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))), x1 : (X1 -> X3), x2 : (X2 -> X3) |- (x {X3}) x1 : ((X2 -> X3) -> X3) by rule T-App on d3, d5
+    d7: *, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))), x1 : (X1 -> X3), x2 : (X2 -> X3) |- x2 : (X2 -> X3) by rule T-Var
+    d8: *, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))), x1 : (X1 -> X3), x2 : (X2 -> X3) |- (((x {X3}) x1) x2) : X3 by rule T-App on d6, d7
+    d9: *, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))), x1 : (X1 -> X3) |- lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2) : ((X2 -> X3) -> X3) by rule T-Abs on d8
+    d10: *, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))) |- lambda x1 : (X1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)) : ((X1 -> X3) -> ((X2 -> X3) -> X3)) by rule T-Abs on d9
+    d11: *, X1, X2, X3 |- lambda x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))) . (lambda x1 : (X1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2))) : ((fall X . ((X1 -> X) -> ((X2 -> X) -> X))) -> ((X1 -> X3) -> ((X2 -> X3) -> X3))) by rule T-Abs on d10
+    d12: *, X1, X2 |- lambda X3 . (lambda x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))) . (lambda x1 : (X1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))) : fall X3 . (((fall X . ((X1 -> X) -> ((X2 -> X) -> X))) -> ((X1 -> X3) -> ((X2 -> X3) -> X3)))) by rule T-TAbs on d11
+    d13: *, X1 |- lambda X2 . (lambda X3 . (lambda x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))) . (lambda x1 : (X1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2))))) : fall X2 . (fall X3 . (((fall X . ((X1 -> X) -> ((X2 -> X) -> X))) -> ((X1 -> X3) -> ((X2 -> X3) -> X3))))) by rule T-TAbs on d12
+    proof by rule T-TAbs on d13
+end lemma
+
+// 8
+
+judgment multistep: t ->* t
+
+--------------- Ms-Refl
+t ->* t
+
+t -> t'
+t' ->* t''
+--------------- Ms-Trans
+t ->* t''   
+
+// tapp multistep: if t ->* t' then t {T} ->* t' {T}
+lemma multi-tapp:
+    forall d: t ->* t'
+    forall T2
+    exists t {T2} ->* t' {T2}
+    proof by induction on d:
+    case rule
+        ------------ Ms-Refl
+        _: t ->* t
+    is
+        proof by rule Ms-Refl
+    end case
+    case rule
+        d3: t1 -> t1'
+        d4: t1' ->* t1''
+        ------------------ Ms-Trans
+        _: t1 ->* t1''
+    is
+        d5: t1 {T2} -> t1' {T2} by rule E-TApp on d3
+        d6: t1' {T2} ->* t1'' {T2} by lemma multi-tapp on d4, T2
+        proof by rule Ms-Trans on d5, d6
+    end case
+    end induction
+end lemma
+
+lemma multi-trans:
+    forall d1: t ->* t'
+    forall d2: t' ->* t''
+    exists t ->* t''
+    proof by induction on d1:
+    case rule
+        ------------ Ms-Refl
+        _: t ->* t
+    is
+        proof by d2
+    end case
+    case rule
+        d3: t1 -> t1'
+        d4: t1' ->* t1''
+        ------------------ Ms-Trans
+        _: t1 ->* t1''
+    is
+        d5: t1' ->* t'' by lemma multi-trans on d4, d2
+        proof by rule Ms-Trans on d3, d5
+    end case
+    end induction
+end lemma
+
+lemma multi-app1:
+    forall d: t1 ->* t1'
+    forall t2
+    exists t1 t2 ->* t1' t2
+    proof by induction on d:
+    case rule
+        ------------ Ms-Refl
+        _: t ->* t
+    is
+        proof by rule Ms-Refl
+    end case
+    case rule
+        d3: t -> t'
+        d4: t' ->* t''
+        ------------------ Ms-Trans
+        _: t ->* t''
+    is
+        d5: t t2 -> t' t2 by rule E-App1 on d3
+        d6: t' t2 ->* t'' t2 by lemma multi-app1 on d4, t2
+        proof by rule Ms-Trans on d5, d6
+    end case
+    end induction
+end lemma
+
+lemma multi-app2:
+    forall d1: value t1
+    forall d2: t2 ->* t2'
+    exists t1 t2 ->* t1 t2'
+    proof by induction on d2:
+    case rule
+        ------------ Ms-Refl
+        _: t ->* t
+    is
+        proof by rule Ms-Refl
+    end case
+    case rule
+        d3: t -> t'
+        d4: t' ->* t''
+        ------------------ Ms-Trans
+        _: t ->* t''
+    is
+        d5: t1 t -> t1 t' by rule E-App2 on d1, d3
+        d6: t1 t' ->* t1 t'' by lemma multi-app2 on d1, d4
+        proof by rule Ms-Trans on d5, d6
+    end case
+    end induction
+end lemma
+
+// cases applied to three types reduces to its instantiated body
+lemma cases-inst:
+    forall T1
+    forall T2
+    forall T3
+    exists (((cases {T1}) {T2}) {T3}) ->* (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2))))
+    d1: (cases {T1}) -> (lambda X2 . (lambda X3 . (lambda x : (T1 mais X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) by rule E-TAppTAbs
+    d2: (lambda X2 . (lambda X3 . (lambda x : (T1 mais X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) ->* (lambda X2 . (lambda X3 . (lambda x : (T1 mais X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) by rule Ms-Refl
+    d3: (cases {T1}) ->* (lambda X2 . (lambda X3 . (lambda x : (T1 mais X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) by rule Ms-Trans on d1, d2
+    d4: ((cases {T1}) {T2}) ->* ((lambda X2 . (lambda X3 . (lambda x : (T1 mais X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) {T2}) by lemma multi-tapp on d3, T2
+    d5: ((lambda X2 . (lambda X3 . (lambda x : (T1 mais X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) {T2}) -> (lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) by rule E-TAppTAbs
+    d6: (lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) ->* (lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) by rule Ms-Refl
+    d7: ((lambda X2 . (lambda X3 . (lambda x : (T1 mais X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) {T2}) ->* (lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) by rule Ms-Trans on d5, d6
+    d8: ((cases {T1}) {T2}) ->* (lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) by lemma multi-trans on d4, d7
+    d9: (((cases {T1}) {T2}) {T3}) ->* ((lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) {T3}) by lemma multi-tapp on d8, T3
+    d10: ((lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) {T3}) -> (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule E-TAppTAbs
+    d11: (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) ->* (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule Ms-Refl
+    d12: ((lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) {T3}) ->* (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule Ms-Trans on d10, d11
+    proof by lemma multi-trans on d9, d12
+end lemma
+
+// inl applied to two types and a value reduces to a type abstraction
+lemma inl-inst:
+    forall T1
+    forall T2
+    forall dv: value t
+    exists (((inl {T1}) {T2}) t) ->* (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))
+    d1: (inl {T1}) -> (lambda X2 . (lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)))))) by rule E-TAppTAbs
+    d2: (lambda X2 . (lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)))))) ->* (lambda X2 . (lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)))))) by rule Ms-Refl
+    d3: (inl {T1}) ->* (lambda X2 . (lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)))))) by rule Ms-Trans on d1, d2
+    d4: ((inl {T1}) {T2}) ->* ((lambda X2 . (lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)))))) {T2}) by lemma multi-tapp on d3, T2
+    d5: ((lambda X2 . (lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)))))) {T2}) -> (lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x1 x))))) by rule E-TAppTAbs
+    d6: (lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x1 x))))) ->* (lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x1 x))))) by rule Ms-Refl
+    d7: ((lambda X2 . (lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)))))) {T2}) ->* (lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x1 x))))) by rule Ms-Trans on d5, d6
+    d8: ((inl {T1}) {T2}) ->* (lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x1 x))))) by lemma multi-trans on d4, d7
+    d9: (((inl {T1}) {T2}) t) ->* ((lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x1 x))))) t) by lemma multi-app1 on d8, t
+    d10: ((lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x1 x))))) t) -> (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) by rule E-AppAbs on dv
+    d11: (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) ->* (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) by rule Ms-Refl
+    d12: ((lambda x : T1 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x1 x))))) t) ->* (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) by rule Ms-Trans on d10, d11
+    proof by lemma multi-trans on d9, d12
+end lemma
+
+// E-CaseInl: cases (inl v) (lambda x1. t1) (lambda x2. t2) ->* [x1 -> v] t1
+lemma case-inl:
+    forall dv: value t
+    forall dF1: value (lambda x3 : T1 . t1[x3])
+    forall dF2: value (lambda x4 : T2 . t2[x4])
+    forall T3
+    exists ((((((cases {T1}) {T2}) {T3}) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t1[t]
+    // 1. reduce the head cases {T1} {T2} {T3}
+    d1: (((cases {T1}) {T2}) {T3}) ->* (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by lemma cases-inst on T1, T2, T3
+    d2: ((((cases {T1}) {T2}) {T3}) (((inl {T1}) {T2}) t)) ->* ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) by lemma multi-app1 on d1, (((inl {T1}) {T2}) t)
+    d3: (((((cases {T1}) {T2}) {T3}) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) ->* (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) by lemma multi-app1 on d2, (lambda x3 : T1 . t1[x3])
+    d4: ((((((cases {T1}) {T2}) {T3}) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by lemma multi-app1 on d3, (lambda x4 : T2 . t2[x4])
+
+    // 2. reduce the injected argument to a value
+    d5: (((inl {T1}) {T2}) t) ->* (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) by lemma inl-inst on T1, T2, dv
+    d6: value (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule value-abs
+    d7: ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) ->* ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) by lemma multi-app2 on d6, d5
+    d8: (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) ->* (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) by lemma multi-app1 on d7, (lambda x3 : T1 . t1[x3])
+    d9: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by lemma multi-app1 on d8, (lambda x4 : T2 . t2[x4])
+    
+    // 3. beta-reduce cases against the three arguments
+    d10: value (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) by rule value-tabs
+    d11: ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) -> (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) by rule E-AppAbs on d10
+    d12: (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) -> ((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) by rule E-App1 on d11
+    d13: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) -> (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by rule E-App1 on d12
+    d14: ((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) -> (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) by rule E-AppAbs on dF1
+    d15: (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) -> ((lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) (lambda x4 : T2 . t2[x4])) by rule E-App1 on d14
+    d16: ((lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) (lambda x4 : T2 . t2[x4])) -> ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by rule E-AppAbs on dF2
+
+    // 4. instantiate the body of the injected value at T3 and apply the handlers
+    d17: ((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) -> (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (x1 t))) by rule E-TAppTAbs
+    d18: (((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) (lambda x3 : T1 . t1[x3])) -> ((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (x1 t))) (lambda x3 : T1 . t1[x3])) by rule E-App1 on d17
+    d19: ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) -> (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (x1 t))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by rule E-App1 on d18
+    d20: ((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (x1 t))) (lambda x3 : T1 . t1[x3])) -> (lambda x2 : (T2 -> T3) . ((lambda x3 : T1 . t1[x3]) t)) by rule E-AppAbs on dF1
+    d21: (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (x1 t))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) -> ((lambda x2 : (T2 -> T3) . ((lambda x3 : T1 . t1[x3]) t)) (lambda x4 : T2 . t2[x4])) by rule E-App1 on d20
+    d22: ((lambda x2 : (T2 -> T3) . ((lambda x3 : T1 . t1[x3]) t)) (lambda x4 : T2 . t2[x4])) -> ((lambda x3 : T1 . t1[x3]) t) by rule E-AppAbs on dF2
+    d23: ((lambda x3 : T1 . t1[x3]) t) -> t1[t] by rule E-AppAbs on dv
+
+    // 5. chain the single steps (built backwards) and the multi-step pieces
+    d24: t1[t] ->* t1[t] by rule Ms-Refl
+    d25: ((lambda x3 : T1 . t1[x3]) t) ->* t1[t] by rule Ms-Trans on d23, d24
+    d26: ((lambda x2 : (T2 -> T3) . ((lambda x3 : T1 . t1[x3]) t)) (lambda x4 : T2 . t2[x4])) ->* t1[t] by rule Ms-Trans on d22, d25
+    d27: (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (x1 t))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t1[t] by rule Ms-Trans on d21, d26
+    d28: ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t1[t] by rule Ms-Trans on d19, d27
+    d29: ((lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) (lambda x4 : T2 . t2[x4])) ->* t1[t] by rule Ms-Trans on d16, d28
+    d30: (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t1[t] by rule Ms-Trans on d15, d29
+    d31: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t1[t] by rule Ms-Trans on d13, d30
+    d32: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t1[t] by lemma multi-trans on d9, d31
+    proof by lemma multi-trans on d4, d32
+end lemma
+
+// 9
+
+// inr applied to two types and a value reduces to a type abstraction
+lemma inr-inst:
+    forall T1
+    forall T2
+    forall dv: value t
+    exists (((inr {T1}) {T2}) t) ->* (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))
+    d1: (inr {T1}) -> (lambda X2 . (lambda x : X2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (X2 -> X) . (x2 x)))))) by rule E-TAppTAbs
+    d2: (lambda X2 . (lambda x : X2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (X2 -> X) . (x2 x)))))) ->* (lambda X2 . (lambda x : X2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (X2 -> X) . (x2 x)))))) by rule Ms-Refl
+    d3: (inr {T1}) ->* (lambda X2 . (lambda x : X2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (X2 -> X) . (x2 x)))))) by rule Ms-Trans on d1, d2
+    d4: ((inr {T1}) {T2}) ->* ((lambda X2 . (lambda x : X2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (X2 -> X) . (x2 x)))))) {T2}) by lemma multi-tapp on d3, T2
+    d5: ((lambda X2 . (lambda x : X2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (X2 -> X) . (x2 x)))))) {T2}) -> (lambda x : T2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x2 x))))) by rule E-TAppTAbs
+    d6: (lambda x : T2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x2 x))))) ->* (lambda x : T2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x2 x))))) by rule Ms-Refl
+    d7: ((lambda X2 . (lambda x : X2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (X2 -> X) . (x2 x)))))) {T2}) ->* (lambda x : T2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x2 x))))) by rule Ms-Trans on d5, d6
+    d8: ((inr {T1}) {T2}) ->* (lambda x : T2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x2 x))))) by lemma multi-trans on d4, d7
+    d9: (((inr {T1}) {T2}) t) ->* ((lambda x : T2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x2 x))))) t) by lemma multi-app1 on d8, t
+    d10: ((lambda x : T2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x2 x))))) t) -> (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) by rule E-AppAbs on dv
+    d11: (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) ->* (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) by rule Ms-Refl
+    d12: ((lambda x : T2 . (lambda X . (lambda x1 : (T1 -> X) . (lambda x2 : (T2 -> X) . (x2 x))))) t) ->* (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) by rule Ms-Trans on d10, d11
+    proof by lemma multi-trans on d9, d12
+end lemma
+
+// E-CaseInr: cases (inr v) (lambda x1. t1) (lambda x2. t2) ->* [x2 -> v] t2
+lemma case-inr:
+    forall dv: value t
+    forall dF1: value (lambda x3 : T1 . t1[x3])
+    forall dF2: value (lambda x4 : T2 . t2[x4])
+    forall T3
+    exists ((((((cases {T1}) {T2}) {T3}) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t2[t]
+    // 1. reduce the head cases {T1} {T2} {T3}
+    d1: (((cases {T1}) {T2}) {T3}) ->* (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by lemma cases-inst on T1, T2, T3
+    d2: ((((cases {T1}) {T2}) {T3}) (((inr {T1}) {T2}) t)) ->* ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) by lemma multi-app1 on d1, (((inr {T1}) {T2}) t)
+    d3: (((((cases {T1}) {T2}) {T3}) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) ->* (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) by lemma multi-app1 on d2, (lambda x3 : T1 . t1[x3])
+    d4: ((((((cases {T1}) {T2}) {T3}) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by lemma multi-app1 on d3, (lambda x4 : T2 . t2[x4])
+
+    // 2. reduce the injected argument to a value
+    d5: (((inr {T1}) {T2}) t) ->* (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) by lemma inr-inst on T1, T2, dv
+    d6: value (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule value-abs
+    d7: ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) ->* ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) by lemma multi-app2 on d6, d5
+    d8: (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) ->* (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) by lemma multi-app1 on d7, (lambda x3 : T1 . t1[x3])
+    d9: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by lemma multi-app1 on d8, (lambda x4 : T2 . t2[x4])
+
+    // 3. beta-reduce cases against the three arguments
+    d10: value (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) by rule value-tabs
+    d11: ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) -> (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) by rule E-AppAbs on d10
+    d12: (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) -> ((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) by rule E-App1 on d11
+    d13: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) -> (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by rule E-App1 on d12
+    d14: ((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) -> (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) by rule E-AppAbs on dF1
+    d15: (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) -> ((lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) (lambda x4 : T2 . t2[x4])) by rule E-App1 on d14
+    d16: ((lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) (lambda x4 : T2 . t2[x4])) -> ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by rule E-AppAbs on dF2
+
+    // 4. instantiate the body of the injected value at T3 and apply the handlers
+    d17: ((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) -> (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (x2 t))) by rule E-TAppTAbs
+    d18: (((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) (lambda x3 : T1 . t1[x3])) -> ((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (x2 t))) (lambda x3 : T1 . t1[x3])) by rule E-App1 on d17
+    d19: ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) -> (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (x2 t))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by rule E-App1 on d18
+    d20: ((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (x2 t))) (lambda x3 : T1 . t1[x3])) -> (lambda x2 : (T2 -> T3) . (x2 t)) by rule E-AppAbs on dF1
+    d21: (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (x2 t))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) -> ((lambda x2 : (T2 -> T3) . (x2 t)) (lambda x4 : T2 . t2[x4])) by rule E-App1 on d20
+    d22: ((lambda x2 : (T2 -> T3) . (x2 t)) (lambda x4 : T2 . t2[x4])) -> ((lambda x4 : T2 . t2[x4]) t) by rule E-AppAbs on dF2
+    d23: ((lambda x4 : T2 . t2[x4]) t) -> t2[t] by rule E-AppAbs on dv
+
+    // 5. chain the single steps (built backwards) and the multi-step pieces
+    d24: t2[t] ->* t2[t] by rule Ms-Refl
+    d25: ((lambda x4 : T2 . t2[x4]) t) ->* t2[t] by rule Ms-Trans on d23, d24
+    d26: ((lambda x2 : (T2 -> T3) . (x2 t)) (lambda x4 : T2 . t2[x4])) ->* t2[t] by rule Ms-Trans on d22, d25
+    d27: (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (x2 t))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t2[t] by rule Ms-Trans on d21, d26
+    d28: ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t2[t] by rule Ms-Trans on d19, d27
+    d29: ((lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) (lambda x4 : T2 . t2[x4])) ->* t2[t] by rule Ms-Trans on d16, d28
+    d30: (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t2[t] by rule Ms-Trans on d15, d29
+    d31: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t2[t] by rule Ms-Trans on d13, d30
+    d32: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t2[t] by lemma multi-trans on d9, d31
+    proof by lemma multi-trans on d4, d32
+end lemma
+
+// 11
+
+/*
+-------------------------------------------- T-Var
+    Gamma, X, x1: (X -> X), x2: X |- x2: X
+------------------------------------------------------------------------- T-Abs
+    Gamma, X, x1: (X -> X) |- (lambda x2 : X . x2) : (X -> X)
+----------------------------------------------------------------------------------------- T-Abs
+    Gamma, X |- (lambda x1 : (X -> X) . (lambda x2 : X . x2)) : ((X -> X) -> (X -> X))
+------------------------------------------------------------------------------------------- T-TAbs
+    Gamma |- zero : Nat
+*/
+
+lemma zero-is-typable:
+    exists * |- zero : Nat
+    d1: *, X, x1 : (X -> X), x2 : X |- x2 : X by rule T-Var
+    d2: *, X, x1 : (X -> X) |- lambda x2 : X . x2 : (X -> X) by rule T-Abs on d1
+    d3: *, X |- lambda x1 : (X -> X) . (lambda x2 : X . x2) : ((X -> X) -> (X -> X)) by rule T-Abs on d2
+    proof by rule T-TAbs on d3
+end lemma
+
+
+/*                                                                              
+
+                                                                                                                                                        -------------------------- T-Var
+                                                                                                                                                        Gamma, x : Nat |- x : Nat
+                                                                            ------------------------------------------------------ T-Var                ---------------------------------------------------- Weakening
+                                                                            Gamma, x : Nat, X, x1 : (X -> X) |- x1 : (X -> X)                           Gamma, x : Nat, X, x1 : (X -> X), x2 : X |- x : Nat
+                                                                            -------------------------------------------------------------- Weakening   ----------------------------------------------------------------------------- T-TApp
+                                                                            Gamma, x : Nat, X, x1 : (X -> X), x2 : X |- x1 : (X -> X)                   Gamma, x : Nat, X, x1 : (X -> X), x2 : X |- x {X} : ((X -> X) -> (X -> X))
+------------------------------------------------------ T-Var               ------------------------------------------------------------------ T-App                                                                                     ----------------------------------------------------- T-Var
+    Gamma, x : Nat, X, x1 : (X -> X) |- x1 : (X -> X)                       Gamma, x : Nat, X, x1 : (X -> X), x2 : X |- (x {X}) x1 : (X -> X)                                                                                               Gamma, x : Nat, X, x1 : (X -> X), x2 : X |- x2 : X 
+-------------------------------------------------------------- Weakening  ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ T-App
+    Gamma, x : Nat, X, x1 : (X -> X), x2 : X |- x1 : (X -> X)               Gamma, x : Nat, X, x1 : (X -> X), x2 : X |- ((x {X}) x1) x2 : X
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-App
+    Gamma, x : Nat, X, x1 : (X -> X), x2 : X |- x1 (((x {X}) x1) x2) : X 
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ T-Abs
+    Gamma, x : Nat, X, x1 : (X -> X) |- lambda x2 : X . (x1 (((x {X}) x1) x2)) : (X -> X)
+------------------------------------------------------------------------------------------------------------------- T-Abs
+    Gamma, x : Nat, X |- lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((x {X}) x1) x2))) : ((X -> X) -> (X -> X))
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-TAbs
+    Gamma, x : Nat |- lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((x {X}) x1) x2)))) : Nat
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ T-Abs
+    Gamma |- succ : (Nat -> Nat)
+*/
+
+lemma succ-is-typable:
+    exists * |- succ : (Nat -> Nat)
+    d1: *, x : Nat |- x : Nat by rule T-Var
+    d2: *, x : Nat, X, x1 : (X -> X), x2 : X |- x : Nat by weakening on d1
+    d3: *, x : Nat, X, x1 : (X -> X), x2 : X |- x {X} : ((X -> X) -> (X -> X)) by rule T-TApp on d2
+    d4: *, x : Nat, X, x1 : (X -> X) |- x1 : (X -> X) by rule T-Var
+    d5: *, x : Nat, X, x1 : (X -> X), x2 : X |- x1 : (X -> X) by weakening on d4
+    d6: *, x : Nat, X, x1 : (X -> X), x2 : X |- (x {X}) x1 : (X -> X) by rule T-App on d3, d5
+    d7: *, x : Nat, X, x1 : (X -> X), x2 : X |- x2 : X by rule T-Var
+    d8: *, x : Nat, X, x1 : (X -> X), x2 : X |- ((x {X}) x1) x2 : X by rule T-App on d6, d7
+    d9: *, x : Nat, X, x1 : (X -> X), x2 : X |- x1 (((x {X}) x1) x2) : X by rule T-App on d5, d8
+    d10: *, x : Nat, X, x1 : (X -> X) |- lambda x2 : X . (x1 (((x {X}) x1) x2)) : (X -> X) by rule T-Abs on d9
+    d11: *, x : Nat, X |- lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((x {X}) x1) x2))) : ((X -> X) -> (X -> X)) by rule T-Abs on d10
+    d12: *, x : Nat |- lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((x {X}) x1) x2)))) : Nat by rule T-TAbs on d11
+    proof by rule T-Abs on d12
+end lemma
+
+// 12
+
+/*
+    iter := lambda X1 . (lambda x : Nat . (lambda x1 : X1 . (lambda x2 : (X1 -> X1) . (((x {X1}) x2) x1))))
+
+---------------------------------- T-Var
+    Gamma, X1, x: Nat |- x : Nat
+-------------------------------------------------------------- Weakening
+    Gamma, X1, x: Nat, x1 : X1, x2 : (X1 -> X1) |- x : Nat
+--------------------------------------------------------------------------------------- T-TApp      ---------------------------------------------------------------- T-Var                  ------------------------------------------- T-Var
+    Gamma, X1, x: Nat, x1 : X1, x2 : (X1 -> X1) |- x {X1} : ((X1 -> X1) -> (X1 -> X1))             Gamma, X1, x: Nat, x1 : X1, x2 : (X1 -> X1) |- x2 : (X1 -> X1)                            Gamma, X1, x: Nat, x1 : X1 |- x1: X1
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-App     ---------------------------------------------------------- Weakening
+    Gamma, X1, x: Nat, x1 : X1, x2 : (X1 -> X1) |- (x {X1}) x2 : (X1 -> X1)                                                                                                              Gamma, X1, x: Nat, x1 : X1, x2 : (X1 -> X1) |- x1: X1 
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-App
+    Gamma, X1, x: Nat, x1: X1, x2: (X1 -> X1) |- ((x {X1}) x2) x1 : X1 
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+    Gamma, X1, x: Nat, x1: X1 |- lambda x2 : (X1 -> X1) . (...) : ((X1 -> X1) -> X1)
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+    Gamma, X1, x: Nat |- lambda x1: X1 . (...) : (X1 -> ((X1 -> X1) -> X1))
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+    Gamma, X1 |-  lambda x : Nat . (...) : (Nat -> (X1 -> ((X1 -> X1) -> X1)))
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-TAbs
+    Gamma |- iter : fall X1 . (Nat -> (X1 -> ((X1 -> X1) -> X1)))
+*/
+
+lemma iter-is-typable:
+    exists * |- iter : fall X1 . (Nat -> (X1 -> ((X1 -> X1) -> X1)))
+    d1: *, X1, x : Nat |- x : Nat by rule T-Var
+    d2: *, X1, x : Nat, x1 : X1, x2 : (X1 -> X1) |- x : Nat by weakening on d1
+    d3: *, X1, x : Nat, x1 : X1, x2 : (X1 -> X1) |- x {X1} : ((X1 -> X1) -> (X1 -> X1)) by rule T-TApp on d2
+    d4: *, X1, x : Nat, x1 : X1, x2 : (X1 -> X1) |- x2 : (X1 -> X1) by rule T-Var
+    d5: *, X1, x : Nat, x1 : X1, x2 : (X1 -> X1) |- (x {X1}) x2 : (X1 -> X1) by rule T-App on d3, d4
+    d6: *, X1, x : Nat, x1 : X1 |- x1 : X1 by rule T-Var
+    d7: *, X1, x : Nat, x1 : X1, x2 : (X1 -> X1) |- x1 : X1 by weakening on d6
+    d8: *, X1, x : Nat, x1 : X1, x2 : (X1 -> X1) |- ((x {X1}) x2) x1 : X1 by rule T-App on d5, d7
+    d9: *, X1, x : Nat, x1 : X1 |- lambda x2 : (X1 -> X1) . (((x {X1}) x2) x1) : ((X1 -> X1) -> X1) by rule T-Abs on d8
+    d10: *, X1, x : Nat |- lambda x1 : X1 . (lambda x2 : (X1 -> X1) . (((x {X1}) x2) x1)) : (X1 -> ((X1 -> X1) -> X1)) by rule T-Abs on d9
+    d11: *, X1 |- lambda x : Nat . (lambda x1 : X1 . (lambda x2 : (X1 -> X1) . (((x {X1}) x2) x1))) : (Nat -> (X1 -> ((X1 -> X1) -> X1))) by rule T-Abs on d10
+    proof by rule T-TAbs on d11
+end lemma
+
+// 13
+
+// iter {T} t t1 t2 unfolds to t {T} t2 t1, for values t (the number), t1 and t2
+lemma iter-unfold:
+    forall T
+    forall dv: value t
+    forall dv1: value t1
+    forall dv2: value t2
+    exists ((((iter {T}) t) t1) t2) ->* (((t {T}) t2) t1)
+    d1: (iter {T}) -> (lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) by rule E-TAppTAbs
+    d2: ((iter {T}) t) -> ((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) t) by rule E-App1 on d1
+    d3: (((iter {T}) t) t1) -> (((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) t) t1) by rule E-App1 on d2
+    d4: ((((iter {T}) t) t1) t2) -> ((((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) t) t1) t2) by rule E-App1 on d3
+    d5: ((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) t) -> (lambda x1 : T . (lambda x2 : (T -> T) . (((t {T}) x2) x1))) by rule E-AppAbs on dv
+    d6: (((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) t) t1) -> ((lambda x1 : T . (lambda x2 : (T -> T) . (((t {T}) x2) x1))) t1) by rule E-App1 on d5
+    d7: ((((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) t) t1) t2) -> (((lambda x1 : T . (lambda x2 : (T -> T) . (((t {T}) x2) x1))) t1) t2) by rule E-App1 on d6
+    d8: ((lambda x1 : T . (lambda x2 : (T -> T) . (((t {T}) x2) x1))) t1) -> (lambda x2 : (T -> T) . (((t {T}) x2) t1)) by rule E-AppAbs on dv1
+    d9: (((lambda x1 : T . (lambda x2 : (T -> T) . (((t {T}) x2) x1))) t1) t2) -> ((lambda x2 : (T -> T) . (((t {T}) x2) t1)) t2) by rule E-App1 on d8
+    d10: ((lambda x2 : (T -> T) . (((t {T}) x2) t1)) t2) -> (((t {T}) t2) t1) by rule E-AppAbs on dv2
+    d11: (((t {T}) t2) t1) ->* (((t {T}) t2) t1) by rule Ms-Refl
+    d12: ((lambda x2 : (T -> T) . (((t {T}) x2) t1)) t2) ->* (((t {T}) t2) t1) by rule Ms-Trans on d10, d11
+    d13: (((lambda x1 : T . (lambda x2 : (T -> T) . (((t {T}) x2) x1))) t1) t2) ->* (((t {T}) t2) t1) by rule Ms-Trans on d9, d12
+    d14: ((((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) t) t1) t2) ->* (((t {T}) t2) t1) by rule Ms-Trans on d7, d13
+    proof by rule Ms-Trans on d4, d14
+end lemma
+
+// E-Iter-Z: iter {T} zero t1 t2 ->* t1
+lemma iter-zero:
+    forall T
+    forall dv1: value t1
+    forall dv2: value t2
+    exists (((((iter {T}) zero) t1) t2) ->* t1)
+    d1: value zero by rule value-tabs
+    d2: ((((iter {T}) zero) t1) t2) ->* (((zero {T}) t2) t1) by lemma iter-unfold on T, d1, dv1, dv2
+    d3: (zero {T}) -> (lambda x1 : (T -> T) . (lambda x2 : T . x2)) by rule E-TAppTAbs
+    d4: ((zero {T}) t2) -> ((lambda x1 : (T -> T) . (lambda x2 : T . x2)) t2) by rule E-App1 on d3
+    d5: (((zero {T}) t2) t1) -> (((lambda x1 : (T -> T) . (lambda x2 : T . x2)) t2) t1) by rule E-App1 on d4
+    d6: ((lambda x1 : (T -> T) . (lambda x2 : T . x2)) t2) -> (lambda x2 : T . x2) by rule E-AppAbs on dv2
+    d7: (((lambda x1 : (T -> T) . (lambda x2 : T . x2)) t2) t1) -> ((lambda x2 : T . x2) t1) by rule E-App1 on d6
+    d8: ((lambda x2 : T . x2) t1) -> t1 by rule E-AppAbs on dv1
+    d9: t1 ->* t1 by rule Ms-Refl
+    d10: ((lambda x2 : T . x2) t1) ->* t1 by rule Ms-Trans on d8, d9
+    d11: (((lambda x1 : (T -> T) . (lambda x2 : T . x2)) t2) t1) ->* t1 by rule Ms-Trans on d7, d10
+    d12: (((zero {T}) t2) t1) ->* t1 by rule Ms-Trans on d5, d11
+    proof by lemma multi-trans on d2, d12
+end lemma 
+
+// E-Iter-S: iter {T} (succ t) t1 t2 and t2 (iter {T} t t1 t2) reduce to the same term
+lemma iter-succ:
+    forall T
+    forall dv: value t
+    forall dv1: value t1
+    forall dv2: value t2
+    exists ((((iter {T}) (succ t)) t1) t2) ->* (t2 (((t {T}) t2) t1)) and (t2 ((((iter {T}) t) t1) t2)) ->* (t2 (((t {T}) t2) t1))
+    // left: iter {T} (succ t) t1 t2 ->* t2 (t {T} t2 t1)
+    d1: (iter {T}) -> (lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) by rule E-TAppTAbs
+    d2: ((iter {T}) (succ t)) -> ((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) (succ t)) by rule E-App1 on d1
+    d3: (((iter {T}) (succ t)) t1) -> (((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) (succ t)) t1) by rule E-App1 on d2
+    d4: ((((iter {T}) (succ t)) t1) t2) -> ((((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) (succ t)) t1) t2) by rule E-App1 on d3
+    d5: (succ t) -> (lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) by rule E-AppAbs on dv
+    d6: (lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) ->* (lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) by rule Ms-Refl
+    d7: (succ t) ->* (lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) by rule Ms-Trans on d5, d6
+    d8: value (lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) by rule value-abs
+    d9: ((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) (succ t)) ->* ((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) (lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6)))))) by lemma multi-app2 on d8, d7
+    d10: (((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) (succ t)) t1) ->* (((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) (lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6)))))) t1) by lemma multi-app1 on d9, t1
+    d11: ((((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) (succ t)) t1) t2) ->* ((((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) (lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6)))))) t1) t2) by lemma multi-app1 on d10, t2
+    d12: value (lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) by rule value-tabs
+    d13: ((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) (lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6)))))) -> (lambda x1 : T . (lambda x2 : (T -> T) . ((((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) x2) x1))) by rule E-AppAbs on d12
+    d14: (((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) (lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6)))))) t1) -> ((lambda x1 : T . (lambda x2 : (T -> T) . ((((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) x2) x1))) t1) by rule E-App1 on d13
+    d15: ((((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) (lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6)))))) t1) t2) -> (((lambda x1 : T . (lambda x2 : (T -> T) . ((((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) x2) x1))) t1) t2) by rule E-App1 on d14
+    d16: ((lambda x1 : T . (lambda x2 : (T -> T) . ((((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) x2) x1))) t1) -> (lambda x2 : (T -> T) . ((((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) x2) t1)) by rule E-AppAbs on dv1
+    d17: (((lambda x1 : T . (lambda x2 : (T -> T) . ((((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) x2) x1))) t1) t2) -> ((lambda x2 : (T -> T) . ((((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) x2) t1)) t2) by rule E-App1 on d16
+    d18: ((lambda x2 : (T -> T) . ((((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) x2) t1)) t2) -> ((((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) t2) t1) by rule E-AppAbs on dv2
+    d19: ((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) -> (lambda x5 : (T -> T) . (lambda x6 : T . (x5 (((t {T}) x5) x6)))) by rule E-TAppTAbs
+    d20: (((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) t2) -> ((lambda x5 : (T -> T) . (lambda x6 : T . (x5 (((t {T}) x5) x6)))) t2) by rule E-App1 on d19
+    d21: ((((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) t2) t1) -> (((lambda x5 : (T -> T) . (lambda x6 : T . (x5 (((t {T}) x5) x6)))) t2) t1) by rule E-App1 on d20
+    d22: ((lambda x5 : (T -> T) . (lambda x6 : T . (x5 (((t {T}) x5) x6)))) t2) -> (lambda x6 : T . (t2 (((t {T}) t2) x6))) by rule E-AppAbs on dv2
+    d23: (((lambda x5 : (T -> T) . (lambda x6 : T . (x5 (((t {T}) x5) x6)))) t2) t1) -> ((lambda x6 : T . (t2 (((t {T}) t2) x6))) t1) by rule E-App1 on d22
+    d24: ((lambda x6 : T . (t2 (((t {T}) t2) x6))) t1) -> (t2 (((t {T}) t2) t1)) by rule E-AppAbs on dv1 
+    d25: (t2 (((t {T}) t2) t1)) ->* (t2 (((t {T}) t2) t1)) by rule Ms-Refl
+    d26: ((lambda x6 : T . (t2 (((t {T}) t2) x6))) t1) ->* (t2 (((t {T}) t2) t1)) by rule Ms-Trans on d24, d25
+    d27: (((lambda x5 : (T -> T) . (lambda x6 : T . (x5 (((t {T}) x5) x6)))) t2) t1) ->* (t2 (((t {T}) t2) t1)) by rule Ms-Trans on d23, d26
+    d28: ((((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) t2) t1) ->* (t2 (((t {T}) t2) t1)) by rule Ms-Trans on d21, d27
+    d29: ((lambda x2 : (T -> T) . ((((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) x2) t1)) t2) ->* (t2 (((t {T}) t2) t1)) by rule Ms-Trans on d18, d28
+    d30: (((lambda x1 : T . (lambda x2 : (T -> T) . ((((lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6))))) {T}) x2) x1))) t1) t2) ->* (t2 (((t {T}) t2) t1)) by rule Ms-Trans on d17, d29
+    d31: ((((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) (lambda X . (lambda x5 : (X -> X) . (lambda x6 : X . (x5 (((t {X}) x5) x6)))))) t1) t2) ->* (t2 (((t {T}) t2) t1)) by rule Ms-Trans on d15, d30
+    d32: ((((lambda x : Nat . (lambda x1 : T . (lambda x2 : (T -> T) . (((x {T}) x2) x1)))) (succ t)) t1) t2) ->* (t2 (((t {T}) t2) t1)) by lemma multi-trans on d11, d31
+    d33: ((((iter {T}) (succ t)) t1) t2) ->* (t2 (((t {T}) t2) t1)) by rule Ms-Trans on d4, d32
+    // right: t2 (iter {T} t t1 t2) ->* t2 (t {T} t2 t1)
+    d34: ((((iter {T}) t) t1) t2) ->* (((t {T}) t2) t1) by lemma iter-unfold on T, dv, dv1, dv2
+    d35: (t2 ((((iter {T}) t) t1) t2)) ->* (t2 (((t {T}) t2) t1)) by lemma multi-app2 on dv2, d34
+    proof by d33, d35
+end lemma
+
+// 14
+
+/*
+    plus := lambda x : Nat . (lambda x1 : Nat . ((((iter {Nat}) x) x1) succ))
+    
+----------------------------------------------------------------------------------- lemma iter-is-typable
+    Gamma, x: Nat, x1: Nat |- iter : fall X1 . (Nat -> (X1 -> ((X1 -> X1) -> X1)))
+----------------------------------------------------------------------------------- Weakening      ---------------------------- T-Var
+    Gamma, x: Nat, x1: Nat |- iter : fall X1 . (Nat -> (X1 -> ((X1 -> X1) -> X1)))                  Gamma, x: Nat|- x : Nat
+--------------------------------------------------------------------------- T-TApp                  ----------------------------------- Weakening
+    Gamma, x: Nat, x1: Nat |- iter{Nat} : Nat -> Nat -> (Nat -> Nat) -> Nat                         Gamma, x: Nat, x1: Nat |- x : Nat 
+-------------------------------------------------------------------------------------------------------------------------------------------------------- T-App                                                              ------------------------------------- T-Var                 ---------------------------- lemma succ-is-typable
+    Gamma, x: Nat, x1: Nat |- iter {Nat} x : Nat -> (Nat -> Nat) -> Nat                                                                                                                                                     Gamma, x: Nat, x1: Nat |- x1 : Nat                          Gamma |- succ : Nat -> Nat
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-App     -------------------------------------------- Weakening
+    Gamma, x: Nat, x1: Nat |- iter {Nat} x x1 : (Nat -> Nat) -> Nat                                                                                                                                                                                                                  Gamma, x: Nat, x1: Nat |- succ: Nat -> Nat       
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-App
+    Gamma, x: Nat, x1: Nat |- iter {Nat} x x1 succ : Nat
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+    Gamma, x: Nat |- lambda x1: Nat . (...) : (Nat -> Nat)
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- T-Abs
+    Gamma, |- plus : Nat -> (Nat -> Nat)
+*/
+
+lemma plus-is-typable:
+    exists * |- plus : (Nat -> (Nat -> Nat))
+    d1: * |- iter : fall X1 . (Nat -> (X1 -> ((X1 -> X1) -> X1))) by lemma iter-is-typable
+    d2: *, x : Nat, x1 : Nat |- iter : fall X1 . (Nat -> (X1 -> ((X1 -> X1) -> X1))) by weakening on d1
+    d3: *, x : Nat, x1 : Nat |- iter {Nat} : (Nat -> (Nat -> ((Nat -> Nat) -> Nat))) by rule T-TApp on d2
+    d4: *, x : Nat |- x : Nat by rule T-Var
+    d5: *, x : Nat, x1 : Nat |- x : Nat by weakening on d4
+    d6: *, x : Nat, x1 : Nat |- (iter {Nat}) x : (Nat -> ((Nat -> Nat) -> Nat)) by rule T-App on d3, d5
+    d7: *, x : Nat, x1 : Nat |- x1 : Nat by rule T-Var
+    d8: *, x : Nat, x1 : Nat |- ((iter {Nat}) x) x1 : ((Nat -> Nat) -> Nat) by rule T-App on d6, d7
+    d9: * |- succ : (Nat -> Nat) by lemma succ-is-typable
+    d10: *, x : Nat, x1 : Nat |- succ : (Nat -> Nat) by weakening on d9
+    d11: *, x : Nat, x1 : Nat |- (((iter {Nat}) x) x1) succ : Nat by rule T-App on d8, d10
+    d12: *, x : Nat |- lambda x1 : Nat . ((((iter {Nat}) x) x1) succ) : (Nat -> Nat) by rule T-Abs on d11
+    proof by rule T-Abs on d12
+end lemma 
+
+// 15

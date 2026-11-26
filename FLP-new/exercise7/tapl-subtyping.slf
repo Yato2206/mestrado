@@ -1,0 +1,355 @@
+/*
+Subtyping
+Chapter 15, Figures 15-1 (simply typed lambda calculus with subtyping) and
+15-3 (records)
+
+Definitions for Exercises 15.2.1 to 15.2.5 in Types and Programming
+Languages (TAPL), by Benjamin Pierce, 2002, The MIT Press.
+
+Fundamentals of Programming Languages
+MSc in Informatics Engineering
+Faculty of Sciences
+University of Lisbon
+2026/2027
+Vasco T. Vasconcelos
+*/
+
+/*
+Notes on the encoding
+
+- Base type. Nat is an uninterpreted base type, with terms zero and succ t,
+  so that the examples can follow those of TAPL. Its only supertypes are
+  Nat and Top.
+
+- Records. A record is either empty, {}, or a field followed by the
+  remaining fields, {L = t, r}. Thus {a = t1, b = t2} is written
+  {a = t1, {b = t2, {}}}. Record types, R, follow the same scheme.
+
+- Labels. Labels form a fixed set (a, b and c), with a judgment L <> L' for
+  distinct labels. TAPL's examples use labels x, y, z; in SASyLF x is a
+  variable, so we use a, b, c instead.
+
+- Record subtyping. TAPL's rules S-RcdWidth, S-RcdDepth and S-RcdPerm act on
+  whole records, with n fields. On records written as lists we use three
+  rules instead:
+    S-RcdNil:  every record type is a subtype of {} (width, dropping all
+               the fields);
+    S-RcdCons: {L : S, R1} <: {L : T, R2} if S <: T and R1 <: R2 (depth on
+               the first field, and the remaining fields recursively);
+    S-RcdSwap: two adjacent fields with distinct labels swap places.
+  With S-Refl and S-Trans they give TAPL's three rules: width keeps the
+  first n fields (S-RcdCons with S-Refl, n times, then S-RcdNil), depth is
+  S-RcdCons n times, and every permutation is a sequence of adjacent swaps.
+
+- Distinct labels. S-RcdSwap requires distinct labels: with equal labels it
+  would let {a : Top, {a : Nat, {}}} be a subtype of {a : Nat, {a : Top, {}}},
+  and projection on a, which picks the first field, would no longer be sound.
+  Typing does not check that the labels of a record are distinct; the
+  exercises do not need it.
+
+- No evaluation. The exercises are about typing and subtyping only.
+*/
+
+terminals
+    lambda zero succ // terms
+    Top Nat // types
+    a b c // labels
+    in // judgment forms
+
+
+/*
+Syntax
+*/
+
+syntax
+    t ::= x                         // variable
+        | lambda x : T . t[x]       // abstraction
+        | t t                       // application
+        | zero                      // zero
+        | succ t                    // successor
+        | r                         // record
+        | t . L                     // projection
+
+    r ::= {}                        // empty record
+        | { L = t , r }             // a field and the remaining fields
+
+    L ::= a | b | c                 // labels
+
+    S, T, U ::= Top                 // maximum type
+        | Nat                       // base type
+        | T -> T                    // type of functions
+        | R                         // record type
+
+    R ::= {}                        // empty record type
+        | { L : T , R }             // a field and the remaining fields
+
+    Gamma ::= * | Gamma, x : T
+
+
+/*
+Auxiliary judgments
+*/
+
+judgment label-neq: L <> L
+
+--------- neq-a-b
+a <> b
+
+--------- neq-a-c
+a <> c
+
+--------- neq-b-a
+b <> a
+
+--------- neq-b-c
+b <> c
+
+--------- neq-c-a
+c <> a
+
+--------- neq-c-b
+c <> b
+
+judgment type-equality: T = T
+
+------ type-eq
+T = T
+
+// Field lookup in a record type: the first field with label L
+judgment type-lookup: L : T in T
+
+------------------------ LT-Here
+L : T1 in {L : T1, R}
+
+L <> L'
+L : T in R
+------------------------- LT-Skip
+L : T in {L' : T1, R}
+
+
+/*
+Subtyping, Figures 15-1 and 15-3, with records as lists (see the notes)
+*/
+
+judgment subtyping: T <: T
+
+-------- S-Refl
+T <: T
+
+T1 <: T2
+T2 <: T3
+--------- S-Trans
+T1 <: T3
+
+---------- S-Top
+T <: Top
+
+T1 <: S1
+S2 <: T2
+-------------------- S-Arrow
+S1 -> S2 <: T1 -> T2
+
+---------- S-RcdNil
+R <: {}
+
+S <: T
+R1 <: R2
+------------------------------ S-RcdCons
+{L : S, R1} <: {L : T, R2}
+
+L1 <> L2
+-------------------------------------------------- S-RcdSwap
+{L1 : T1, {L2 : T2, R}} <: {L2 : T2, {L1 : T1, R}}
+
+
+/*
+Typing, Figures 15-1 and 15-3
+*/
+
+judgment typing: Gamma |- t : T
+assumes Gamma
+
+----------------------- T-Var
+Gamma, x : T |- x : T
+
+Gamma, x : T1 |- t2[x] : T2
+------------------------------------------- T-Abs
+Gamma |- lambda x : T1 . t2[x] : T1 -> T2
+
+Gamma |- t1 : T11 -> T12
+Gamma |- t2 : T11
+-------------------------- T-App
+Gamma |- t1 t2 : T12
+
+------------------- T-Zero
+Gamma |- zero : Nat
+
+Gamma |- t : Nat
+----------------------- T-Succ
+Gamma |- succ t : Nat
+
+-------------------- T-RcdEmpty
+Gamma |- {} : {}
+
+Gamma |- t1 : T1
+Gamma |- r : R
+--------------------------------------- T-Rcd
+Gamma |- {L = t1, r} : {L : T1, R}
+
+Gamma |- t : T
+L : T' in T
+---------------------- T-Proj
+Gamma |- t . L : T'
+
+Gamma |- t : S
+S <: T
+---------------- T-Sub
+Gamma |- t : T
+
+
+/*
+Lemmas on labels
+*/
+
+lemma label-neq-irreflexive:
+    forall ne: L <> L
+    exists contradiction
+    proof by case analysis on ne:
+    end case analysis
+end lemma
+
+lemma label-neq-symmetric:
+    forall ne: L <> L'
+    exists L' <> L
+    proof by case analysis on ne:
+        case rule
+            --------- neq-a-b
+            _: a <> b
+        is
+            proof by rule neq-b-a
+        end case
+        case rule
+            --------- neq-a-c
+            _: a <> c
+        is
+            proof by rule neq-c-a
+        end case
+        case rule
+            --------- neq-b-a
+            _: b <> a
+        is
+            proof by rule neq-a-b
+        end case
+        case rule
+            --------- neq-b-c
+            _: b <> c
+        is
+            proof by rule neq-c-b
+        end case
+        case rule
+            --------- neq-c-a
+            _: c <> a
+        is
+            proof by rule neq-a-c
+        end case
+        case rule
+            --------- neq-c-b
+            _: c <> b
+        is
+            proof by rule neq-b-c
+        end case
+    end case analysis
+end lemma
+
+
+/*
+Exercises
+
+The exercises below follow the order of the exercise sheet. Replace each
+"proof by unproved" by a proof; for the exercises without a template, write
+the lemmas yourself.
+
+Tips on SASyLF:
+
+- Variables are written x, x1, x2, x', ...; type metavariables are S, T, U
+  and their variants (S1, T2, U', ...). TAPL's labels x, y, z become a, b, c
+  here, and TAPL's variable r becomes x. Do not name a derivation c: c is a
+  label.
+
+- Records nest: {a : Nat, b : Nat} is written {a : Nat, {b : Nat, {}}}. The
+  body of an abstraction needs parentheses when it is a projection, as in
+  lambda x : {a : Nat, {}} . (x . a).
+
+- A metavariable that occurs in the conclusion of a lemma but not in its
+  premises is existential: "exists T = S1 -> S2" says that T is some arrow
+  type.
+
+- Given a derivation e: U = T1 -> T2 of the type-equality judgment,
+    use inversion on e where U := T1 -> T2
+  replaces U by T1 -> T2 in the rest of the proof.
+
+- A conclusion with "and" is proved by naming each part and ending with
+  "proof by d1, d2". A lemma with such a conclusion is used as in
+    d1: T1 <: S1 and d2: S2 <: T2 by lemma my-lemma on d
+
+- A lemma whose conclusion is contradiction cannot end a proof of another
+  judgment directly. Name its result, then use it:
+    con: contradiction by lemma my-lemma on d1, d2
+    proof by contradiction on con
+*/
+
+// Exercise 15.2.1
+lemma ex-15-2-1:
+    exists {a : Nat, {b : Nat, {c : Nat, {}}}} <: {b : Nat, {}}
+    proof by unproved
+end lemma
+
+/*
+Exercise 15.2.2. Two derivations for (λr:{x:Nat}. r.x) {x = 0, y = 1} : Nat,
+written with x for r, labels a and b for x and y, and zero and succ zero for
+0 and 1.
+*/
+
+// T-Sub on the argument
+lemma ex-15-2-2-first:
+    exists * |- (lambda x : {a : Nat, {}} . (x . a)) {a = zero, {b = succ zero, {}}} : Nat
+    proof by unproved
+end lemma
+
+// T-Sub on the function
+lemma ex-15-2-2-second:
+    exists * |- (lambda x : {a : Nat, {}} . (x . a)) {a = zero, {b = succ zero, {}}} : Nat
+    proof by unproved
+end lemma
+
+/*
+Exercise 15.2.3. Write one lemma for each supertype of
+{a : Top, {b : Top, {}}}, and the lemmas for the chains.
+*/
+
+/*
+Exercise 15.2.4
+*/
+
+// (a) No type is a subtype of both Nat and {}
+lemma ex-15-2-4-a:
+    forall d1: T <: Nat
+    forall d2: T <: {}
+    exists contradiction
+    proof by unproved
+end lemma
+
+// Inversion of subtyping on arrow types
+lemma arrow-inversion:
+    forall d: S1 -> S2 <: T1 -> T2
+    exists T1 <: S1 and S2 <: T2
+    proof by unproved
+end lemma
+
+// (b) No arrow type is a supertype of both Nat -> Nat and {} -> Nat
+lemma ex-15-2-4-b:
+    forall d1: Nat -> Nat <: S1 -> S2
+    forall d2: {} -> Nat <: S1 -> S2
+    exists contradiction
+    proof by unproved
+end lemma
