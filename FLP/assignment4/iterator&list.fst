@@ -45,7 +45,7 @@ _= print (toInt three)
 {-
     Resultado obtido de plus one two: 3, igual a three. 
     O plus one two da secção 2 deu o seguinte valor: ΛX. λx1 : (X -> X). λx2 : X. x1 (((two [X]) x1) x2), que é diferente de 3, como provado nesse
-exercício (15). Como explicado antes, q avaliação é call-by-value e não reduz debaixo de lambda,
+exercício (15). Como explicado antes, a avaliação é call-by-value e não reduz debaixo de lambda,
 por isso esse redex (((two [X]) x1) x2) nunca é reduzido.
     Aqui, toInt aplica cada numeral para um tipo, base case e step. Os lambdas são aplicados e o redex é reduzido.
     No final, ambos os resultados são 3, contudo os termos obtidos são diferentes, à semelhança do exercício 15 da secção 2.
