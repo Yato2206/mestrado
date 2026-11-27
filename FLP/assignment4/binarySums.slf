@@ -46,17 +46,17 @@ syntax
     Nat := fall X . ((X -> X) -> (X -> X)) // Successor -> Zero -> X
 
 // 11
-    // λX. λs: X->X. λz: X . z
+    // λX. λs: X -> X. λz: X . z
     // x1 = s, x2 = z
     zero := lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . x2)) // 11
 
-    // λn:CNat. λX. λs: X->X. λz:X . s (n [X] s z)
+    // λn:CNat. λX. λs: X -> X. λz:X . s (n [X] s z)
     // x = n, x1 = s, x2 = z
     succ := lambda x : Nat . (lambda X . (lambda x1 : (X -> X) . (lambda x2 : X . (x1 (((x {X}) x1) x2)))))
 
 // 12
-    // iter = Λc. λn: Nat. λz: c. λs: c → c. n [c] s z
-    // ΛX. λn: Nat. λz: X. λs: X->X . n [X] s z
+    // iter = Λc. λn: Nat. λz: c. λs: c -> c. n [c] s z
+    // ΛX. λn: Nat. λz: X. λs: X -> X . n [X] s z
     // X1 = c, x = n, x1 = base case, x2 = step
     iter := lambda X1 . (lambda x : Nat . (lambda x1 : X1 . (lambda x2 : (X1 -> X1) . (((x {X1}) x2) x1))))
 
@@ -818,7 +818,7 @@ end lemma
         ΛX. λx1 : (X -> X). λx2 : X. x1 (((two [X]) x1) x2).
     Para chegar a three, este termo teria de ser
         ΛX. λx1. λx2. x1 (x1 (x1 x2)),
-    mas o redex ((two [X]) x1) x2 está dentro de ΛX. λx1. λx2.
+    mas o redex (((two [X]) x1) x2) está dentro de ΛX. λx1. λx2.
     A avaliação é call-by-value e não reduz debaixo de lambda,
     por isso esse redex nunca é reduzido.
     O lema plus-one-two-is-stuck mostra que
