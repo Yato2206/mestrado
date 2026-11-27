@@ -4,7 +4,7 @@ terminals
     lambda Lambda fall // terms and types
     value wf           // judgment forms
     // abbreviations
-    mais               // 3 
+    sum                // 3 
     inl                // 4
     inr                // 5
     cases              // 6
@@ -33,13 +33,13 @@ syntax
        | Gamma, x : T               // term variable binding
        | Gamma, X                   // type variable binding
 
-    (T1 mais T2) := fall X . ((T1 -> X) -> ((T2 -> X) -> X))  // 3
+    (T1 sum T2) := fall X . ((T1 -> X) -> ((T2 -> X) -> X))  // 3
     
     inl := lambda X1 . (lambda X2 . (lambda x : X1 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x1 x)))))) // 4
 
     inr := lambda X1 . (lambda X2 . (lambda x : X2 . (lambda X . (lambda x1 : (X1 -> X) . (lambda x2 : (X2 -> X) . (x2 x)))))) // 5
 
-    cases :=  lambda X1 . (lambda X2 . (lambda X3 . (lambda x : (X1 mais X2) . (lambda x1 : (X1 -> X3) . (lambda x2 : (X2 -> X3) . 
+    cases :=  lambda X1 . (lambda X2 . (lambda X3 . (lambda x : (X1 sum X2) . (lambda x1 : (X1 -> X3) . (lambda x2 : (X2 -> X3) . 
     (((x {X3}) x1) x2)))))) // 6
 
 // 10
@@ -126,13 +126,7 @@ Gamma |- lambda X . t2[X] : fall X . T2[X]
 Gamma |- t1 : fall X . T12[X]
 ------------------------------------------- T-TApp
 Gamma |- t1 {T2} : T12[T2]
-/*
-Gamma |- t0: Nat
-Gamma |- t1: T
-Gamma, x: T |- t2[x]: T
-------------------------------------------- T-Iter
-Gamma |- (iter T t1 x . t2[x] t0) : T 
-*/
+
 // 2
 
 judgment type-wf: Gamma |- T wf
@@ -176,7 +170,7 @@ Gamma |- fall X . T1[X] wf
 */
 
 lemma inl-is-typable:
-    exists * |- inl : fall X1 . (fall X2 . (X1 -> (X1 mais X2)))
+    exists * |- inl : fall X1 . (fall X2 . (X1 -> (X1 sum X2)))
     d1: *, X1, X2, x : X1, X, x1 : (X1 -> X) |- x1 : (X1 -> X) by rule T-Var
     d2: *, X1, X2, x : X1, X, x1 : (X1 -> X), x2 : (X2 -> X) |- x1 : (X1 -> X) by weakening on d1
     d3: *, X1, X2, x : X1 |- x : X1 by rule T-Var
@@ -216,7 +210,7 @@ inr := lambda X1 . (lambda X2 . (lambda x : X2 . (lambda X . (lambda x1 : (X1 ->
 */
 
 lemma inr-is-typable:
-    exists * |- inr : fall X1 . (fall X2 . (X2 -> (X1 mais X2)))
+    exists * |- inr : fall X1 . (fall X2 . (X2 -> (X1 sum X2)))
     d1: *, X1, X2, x : X2, X, x1 : (X1 -> X), x2 : (X2 -> X) |- x2 : (X2 -> X) by rule T-Var
     d2: *, X1, X2, x : X2 |- x : X2 by rule T-Var
     d3: *, X1, X2, x : X2, X, x1 : (X1 -> X), x2 : (X2 -> X) |- x : X2 by weakening on d2
@@ -233,7 +227,7 @@ by rule T-TAbs on d6
 end lemma
 
 /*
-    cases :=  lambda X1 . (lambda X2 . (lambda X3 . (lambda x : (X1 mais X2) . (lambda x1 : (X1 -> X3) . (lambda x2 : (X2 -> X3) . 
+    cases :=  lambda X1 . (lambda X2 . (lambda X3 . (lambda x : (X1 sum X2) . (lambda x1 : (X1 -> X3) . (lambda x2 : (X2 -> X3) . 
         (((x {X3}) x1) x2))))))
 
 ------------------------------------------------------------------------------------------------------------------------ T-Var
@@ -259,8 +253,8 @@ end lemma
 
 */
 
-lemma cases-typable:
-    exists * |- cases : fall X1 . (fall X2 . (fall X3 . ((X1 mais X2) -> ((X1 -> X3) -> ((X2 -> X3) -> X3)))))
+lemma cases-is-typable:
+    exists * |- cases : fall X1 . (fall X2 . (fall X3 . ((X1 sum X2) -> ((X1 -> X3) -> ((X2 -> X3) -> X3)))))
     d1: *, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))) |- x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))) by rule T-Var
     d2: *, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))), x1 : (X1 -> X3), x2 : (X2 -> X3) |- x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))) by weakening on d1
     d3: *, X1, X2, X3, x : (fall X . ((X1 -> X) -> ((X2 -> X) -> X))), x1 : (X1 -> X3), x2 : (X2 -> X3) |- x {X3} : ((X1 -> X3) -> ((X2 -> X3) -> X3)) by rule T-TApp on d2
@@ -390,19 +384,19 @@ lemma cases-inst:
     forall T1
     forall T2
     forall T3
-    exists (((cases {T1}) {T2}) {T3}) ->* (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2))))
-    d1: (cases {T1}) -> (lambda X2 . (lambda X3 . (lambda x : (T1 mais X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) by rule E-TAppTAbs
-    d2: (lambda X2 . (lambda X3 . (lambda x : (T1 mais X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) ->* (lambda X2 . (lambda X3 . (lambda x : (T1 mais X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) by rule Ms-Refl
-    d3: (cases {T1}) ->* (lambda X2 . (lambda X3 . (lambda x : (T1 mais X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) by rule Ms-Trans on d1, d2
-    d4: ((cases {T1}) {T2}) ->* ((lambda X2 . (lambda X3 . (lambda x : (T1 mais X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) {T2}) by lemma multi-tapp on d3, T2
-    d5: ((lambda X2 . (lambda X3 . (lambda x : (T1 mais X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) {T2}) -> (lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) by rule E-TAppTAbs
-    d6: (lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) ->* (lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) by rule Ms-Refl
-    d7: ((lambda X2 . (lambda X3 . (lambda x : (T1 mais X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) {T2}) ->* (lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) by rule Ms-Trans on d5, d6
-    d8: ((cases {T1}) {T2}) ->* (lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) by lemma multi-trans on d4, d7
-    d9: (((cases {T1}) {T2}) {T3}) ->* ((lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) {T3}) by lemma multi-tapp on d8, T3
-    d10: ((lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) {T3}) -> (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule E-TAppTAbs
-    d11: (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) ->* (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule Ms-Refl
-    d12: ((lambda X3 . (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) {T3}) ->* (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule Ms-Trans on d10, d11
+    exists (((cases {T1}) {T2}) {T3}) ->* (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2))))
+    d1: (cases {T1}) -> (lambda X2 . (lambda X3 . (lambda x : (T1 sum X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) by rule E-TAppTAbs
+    d2: (lambda X2 . (lambda X3 . (lambda x : (T1 sum X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) ->* (lambda X2 . (lambda X3 . (lambda x : (T1 sum X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) by rule Ms-Refl
+    d3: (cases {T1}) ->* (lambda X2 . (lambda X3 . (lambda x : (T1 sum X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) by rule Ms-Trans on d1, d2
+    d4: ((cases {T1}) {T2}) ->* ((lambda X2 . (lambda X3 . (lambda x : (T1 sum X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) {T2}) by lemma multi-tapp on d3, T2
+    d5: ((lambda X2 . (lambda X3 . (lambda x : (T1 sum X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) {T2}) -> (lambda X3 . (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) by rule E-TAppTAbs
+    d6: (lambda X3 . (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) ->* (lambda X3 . (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) by rule Ms-Refl
+    d7: ((lambda X2 . (lambda X3 . (lambda x : (T1 sum X2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (X2 -> X3) . (((x {X3}) x1) x2)))))) {T2}) ->* (lambda X3 . (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) by rule Ms-Trans on d5, d6
+    d8: ((cases {T1}) {T2}) ->* (lambda X3 . (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) by lemma multi-trans on d4, d7
+    d9: (((cases {T1}) {T2}) {T3}) ->* ((lambda X3 . (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) {T3}) by lemma multi-tapp on d8, T3
+    d10: ((lambda X3 . (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) {T3}) -> (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule E-TAppTAbs
+    d11: (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) ->* (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule Ms-Refl
+    d12: ((lambda X3 . (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> X3) . (lambda x2 : (T2 -> X3) . (((x {X3}) x1) x2))))) {T3}) ->* (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule Ms-Trans on d10, d11
     proof by lemma multi-trans on d9, d12
 end lemma
 
@@ -435,23 +429,23 @@ lemma case-inl:
     forall T3
     exists ((((((cases {T1}) {T2}) {T3}) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t1[t]
     // 1. reduce the head cases {T1} {T2} {T3}
-    d1: (((cases {T1}) {T2}) {T3}) ->* (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by lemma cases-inst on T1, T2, T3
-    d2: ((((cases {T1}) {T2}) {T3}) (((inl {T1}) {T2}) t)) ->* ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) by lemma multi-app1 on d1, (((inl {T1}) {T2}) t)
-    d3: (((((cases {T1}) {T2}) {T3}) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) ->* (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) by lemma multi-app1 on d2, (lambda x3 : T1 . t1[x3])
-    d4: ((((((cases {T1}) {T2}) {T3}) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by lemma multi-app1 on d3, (lambda x4 : T2 . t2[x4])
+    d1: (((cases {T1}) {T2}) {T3}) ->* (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by lemma cases-inst on T1, T2, T3
+    d2: ((((cases {T1}) {T2}) {T3}) (((inl {T1}) {T2}) t)) ->* ((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) by lemma multi-app1 on d1, (((inl {T1}) {T2}) t)
+    d3: (((((cases {T1}) {T2}) {T3}) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) ->* (((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) by lemma multi-app1 on d2, (lambda x3 : T1 . t1[x3])
+    d4: ((((((cases {T1}) {T2}) {T3}) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* ((((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by lemma multi-app1 on d3, (lambda x4 : T2 . t2[x4])
 
     // 2. reduce the injected argument to a value
     d5: (((inl {T1}) {T2}) t) ->* (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) by lemma inl-inst on T1, T2, dv
-    d6: value (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule value-abs
-    d7: ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) ->* ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) by lemma multi-app2 on d6, d5
-    d8: (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) ->* (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) by lemma multi-app1 on d7, (lambda x3 : T1 . t1[x3])
-    d9: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by lemma multi-app1 on d8, (lambda x4 : T2 . t2[x4])
+    d6: value (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule value-abs
+    d7: ((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) ->* ((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) by lemma multi-app2 on d6, d5
+    d8: (((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) ->* (((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) by lemma multi-app1 on d7, (lambda x3 : T1 . t1[x3])
+    d9: ((((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* ((((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by lemma multi-app1 on d8, (lambda x4 : T2 . t2[x4])
     
     // 3. beta-reduce cases against the three arguments
     d10: value (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) by rule value-tabs
-    d11: ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) -> (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) by rule E-AppAbs on d10
-    d12: (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) -> ((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) by rule E-App1 on d11
-    d13: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) -> (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by rule E-App1 on d12
+    d11: ((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) -> (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) by rule E-AppAbs on d10
+    d12: (((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) -> ((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) by rule E-App1 on d11
+    d13: ((((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) -> (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by rule E-App1 on d12
     d14: ((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) -> (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) by rule E-AppAbs on dF1
     d15: (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) -> ((lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) (lambda x4 : T2 . t2[x4])) by rule E-App1 on d14
     d16: ((lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) (lambda x4 : T2 . t2[x4])) -> ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by rule E-AppAbs on dF2
@@ -473,8 +467,8 @@ lemma case-inl:
     d28: ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t1[t] by rule Ms-Trans on d19, d27
     d29: ((lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) (lambda x4 : T2 . t2[x4])) ->* t1[t] by rule Ms-Trans on d16, d28
     d30: (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t1[t] by rule Ms-Trans on d15, d29
-    d31: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t1[t] by rule Ms-Trans on d13, d30
-    d32: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t1[t] by lemma multi-trans on d9, d31
+    d31: ((((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x5 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t1[t] by rule Ms-Trans on d13, d30
+    d32: ((((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inl {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t1[t] by lemma multi-trans on d9, d31
     proof by lemma multi-trans on d4, d32
 end lemma
 
@@ -509,23 +503,23 @@ lemma case-inr:
     forall T3
     exists ((((((cases {T1}) {T2}) {T3}) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t2[t]
     // 1. reduce the head cases {T1} {T2} {T3}
-    d1: (((cases {T1}) {T2}) {T3}) ->* (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by lemma cases-inst on T1, T2, T3
-    d2: ((((cases {T1}) {T2}) {T3}) (((inr {T1}) {T2}) t)) ->* ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) by lemma multi-app1 on d1, (((inr {T1}) {T2}) t)
-    d3: (((((cases {T1}) {T2}) {T3}) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) ->* (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) by lemma multi-app1 on d2, (lambda x3 : T1 . t1[x3])
-    d4: ((((((cases {T1}) {T2}) {T3}) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by lemma multi-app1 on d3, (lambda x4 : T2 . t2[x4])
+    d1: (((cases {T1}) {T2}) {T3}) ->* (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by lemma cases-inst on T1, T2, T3
+    d2: ((((cases {T1}) {T2}) {T3}) (((inr {T1}) {T2}) t)) ->* ((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) by lemma multi-app1 on d1, (((inr {T1}) {T2}) t)
+    d3: (((((cases {T1}) {T2}) {T3}) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) ->* (((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) by lemma multi-app1 on d2, (lambda x3 : T1 . t1[x3])
+    d4: ((((((cases {T1}) {T2}) {T3}) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* ((((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by lemma multi-app1 on d3, (lambda x4 : T2 . t2[x4])
 
     // 2. reduce the injected argument to a value
     d5: (((inr {T1}) {T2}) t) ->* (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) by lemma inr-inst on T1, T2, dv
-    d6: value (lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule value-abs
-    d7: ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) ->* ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) by lemma multi-app2 on d6, d5
-    d8: (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) ->* (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) by lemma multi-app1 on d7, (lambda x3 : T1 . t1[x3])
-    d9: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by lemma multi-app1 on d8, (lambda x4 : T2 . t2[x4])
+    d6: value (lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) by rule value-abs
+    d7: ((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) ->* ((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) by lemma multi-app2 on d6, d5
+    d8: (((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) ->* (((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) by lemma multi-app1 on d7, (lambda x3 : T1 . t1[x3])
+    d9: ((((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* ((((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by lemma multi-app1 on d8, (lambda x4 : T2 . t2[x4])
 
     // 3. beta-reduce cases against the three arguments
     d10: value (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) by rule value-tabs
-    d11: ((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) -> (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) by rule E-AppAbs on d10
-    d12: (((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) -> ((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) by rule E-App1 on d11
-    d13: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) -> (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by rule E-App1 on d12
+    d11: ((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) -> (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) by rule E-AppAbs on d10
+    d12: (((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) -> ((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) by rule E-App1 on d11
+    d13: ((((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) -> (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by rule E-App1 on d12
     d14: ((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) -> (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) by rule E-AppAbs on dF1
     d15: (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) -> ((lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) (lambda x4 : T2 . t2[x4])) by rule E-App1 on d14
     d16: ((lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) (lambda x4 : T2 . t2[x4])) -> ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) by rule E-AppAbs on dF2
@@ -547,8 +541,8 @@ lemma case-inr:
     d28: ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t2[t] by rule Ms-Trans on d19, d27
     d29: ((lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) (lambda x3 : T1 . t1[x3])) x2)) (lambda x4 : T2 . t2[x4])) ->* t2[t] by rule Ms-Trans on d16, d28
     d30: (((lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . ((((lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t)))) {T3}) x1) x2))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t2[t] by rule Ms-Trans on d15, d29
-    d31: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t2[t] by rule Ms-Trans on d13, d30
-    d32: ((((lambda x : (T1 mais T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t2[t] by lemma multi-trans on d9, d31
+    d31: ((((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (lambda X . (lambda x5 : (T1 -> X) . (lambda x6 : (T2 -> X) . (x6 t))))) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t2[t] by rule Ms-Trans on d13, d30
+    d32: ((((lambda x : (T1 sum T2) . (lambda x1 : (T1 -> T3) . (lambda x2 : (T2 -> T3) . (((x {T3}) x1) x2)))) (((inr {T1}) {T2}) t)) (lambda x3 : T1 . t1[x3])) (lambda x4 : T2 . t2[x4])) ->* t2[t] by lemma multi-trans on d9, d31
     proof by lemma multi-trans on d4, d32
 end lemma
 
